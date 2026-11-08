@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#071b31" />
+  <title>SKY DUEL - 3D Airship Combat</title>
+  <style>
+    :root { color-scheme: dark; --cyan:#72e6ff; --panel:rgba(5,18,34,.66); --line:rgba(160,224,255,.22); }
+    * { box-sizing:border-box; }
+    html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#071b31; font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; touch-action:none; }
+    canvas { display:block; width:100%; height:100%; }
+    #ui { position:fixed; inset:0; color:#f3fbff; pointer-events:none; }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,.18); backdrop-filter:blur(8px); }
+    #brand { position:absolute; top:18px; left:20px; padding:10px 14px; letter-spacing:.16em; font-weight:900; font-size:14px; }
+    #brand span { display:block; color:#8fbbd3; font-size:9px; font-weight:600; letter-spacing:.22em; margin-top:3px; }
+    #stats { position:absolute; top:18px; right:20px; width:190px; padding:12px 14px; }
+    .statline { display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:11px; color:#a9c8da; margin-bottom:7px; }
+    .statline strong { color:white; font-size:13px; font-variant-numeric:tabular-nums; }
+    .bar { height:7px; border-radius:10px; background:rgba(255,255,255,.12); overflow:hidden; margin:5px 0 10px; }
+    .bar i { display:block; width:100%; height:100%; border-radius:10px; background:linear-gradient(90deg,#41d5ff,#8bffdb); transition:width .15s; }
+    #enemyBar { background:linear-gradient(90deg,#ff9c59,#ff5577); }
+    #centerMark { position:absolute; left:50%; top:50%; width:34px; height:34px; transform:translate(-50%,-50%); opacity:.8; }
+    #centerMark:before,#centerMark:after { content:""; position:absolute; background:#d7f7ff; box-shadow:0 0 8px #67e5ff; }
+    #centerMark:before { width:1px; height:34px; left:16px; top:0; }
+    #centerMark:after { height:1px; width:34px; top:16px; left:0; }
+    #centerMark b { position:absolute; width:8px; height:8px; border:1px solid #d7f7ff; border-radius:50%; top:12px; left:12px; }
+    #hint { position:absolute; left:50%; bottom:18px; transform:translateX(-50%); padding:8px 13px; color:#c6e0ed; font-size:11px; text-align:center; white-space:nowrap; }
+    #notice { position:absolute; left:50%; top:20%; transform:translate(-50%,-50%); font-size:clamp(22px,4vw,42px); font-weight:950; letter-spacing:.12em; text-shadow:0 4px 22px rgba(0,0,0,.4); opacity:0; transition:opacity .2s; text-align:center; }
+    #notice small { display:block; margin-top:8px; font-size:12px; letter-spacing:.08em; font-weight:600; color:#d4edf7; }
+    #startScreen { position:fixed; z-index:5; inset:0; display:grid; place-items:center; padding:22px; background:linear-gradient(180deg,rgba(5,20,38,.35),rgba(3,12,25,.82)); color:white; }
+    #startCard { pointer-events:auto; width:min(460px,100%); text-align:center; padding:28px 26px 24px; border:1px solid rgba(174,229,255,.25); border-radius:22px; background:rgba(5,20,37,.78); backdrop-filter:blur(14px); box-shadow:0 22px 80px rgba(0,0,0,.35); }
+    .eyebrow { color:#84dff4; font-size:10px; font-weight:800; letter-spacing:.28em; }
+    h1 { margin:9px 0 6px; font-size:clamp(34px,8vw,54px); font-weight:1000; letter-spacing:.08em; line-height:1; }
+    #startCard p { color:#aac6d9; font-size:13px; line-height:1.7; margin:13px 0 20px; }
+    #startBtn { border:0; border-radius:999px; padding:13px 34px; color:#032033; background:linear-gradient(100deg,#75e6ff,#8effd7); font-size:13px; font-weight:950; letter-spacing:.12em; cursor:pointer; box-shadow:0 8px 25px rgba(69,211,239,.22); }
+    #startBtn:active { transform:scale(.98); }
+    #controlNote { margin-top:18px; color:#8eabba; font-size:10px; line-height:1.8; }
+    #mobileControls { display:none; position:absolute; inset:0; pointer-events:none; }
+    .controlBase { pointer-events:auto; position:absolute; bottom:22px; width:112px; height:112px; border-radius:50%; border:1px solid rgba(216,246,255,.38); background:rgba(9,35,55,.32); box-shadow:inset 0 0 25px rgba(120,220,255,.08); touch-action:none; }
+    #lookBase { left:15px; border-color:rgba(133,229,255,.55); }
+    #moveBase { right:15px; border-color:rgba(150,255,213,.48); }
+    .controlStick { position:absolute; left:50%; top:50%; width:46px; height:46px; margin:-23px; border-radius:50%; background:rgba(143,231,255,.55); border:1px solid rgba(236,252,255,.75); box-shadow:0 3px 16px rgba(0,0,0,.25); pointer-events:none; }
+    #moveStick { background:rgba(142,255,206,.5); }
+    .mobileBtn { pointer-events:auto; position:absolute; border-radius:50%; border:1px solid rgba(255,255,255,.52); color:white; font-weight:900; font-size:10px; letter-spacing:.06em; background:rgba(28,117,153,.52); box-shadow:0 5px 22px rgba(0,0,0,.25); touch-action:none; }
+    #fireBtn { left:139px; bottom:40px; width:66px; height:66px; background:rgba(28,145,177,.62); }
+    #boostBtn { right:82px; bottom:154px; width:42px; height:42px; background:rgba(91,132,163,.48); font-size:8px; }
+    #upBtn, #downBtn { right:178px; bottom:154px; width:42px; height:42px; font-size:15px; }
+    #downBtn { right:130px; }
+    .mobileBtn.active { background:rgba(54,220,255,.78); }
+    .controlLabel { position:absolute; bottom:139px; font-size:8px; color:#d1e9f4; letter-spacing:.12em; text-shadow:0 1px 4px #000; }
+    #lookLabel { left:25px; }
+    #moveLabel { right:38px; }
+    @media (pointer:coarse), (max-width:700px) {
+      #mobileControls { display:block; }
+      #hint { bottom:150px; font-size:9px; white-space:normal; max-width:90vw; }
+      #brand { top:10px; left:10px; padding:8px 10px; }
+      #stats { top:10px; right:10px; width:152px; padding:9px 10px; }
+      .statline { font-size:9px; margin-bottom:5px; }
+      .statline strong { font-size:11px; }
+      .bar { height:6px; margin:4px 0 7px; }
+    }
+    @media (max-width:390px) {
+      .controlBase { width:98px; height:98px; bottom:16px; }
+      #lookBase { left:10px; }
+      #moveBase { right:10px; }
+      .controlStick { width:42px; height:42px; margin:-21px; }
+      #fireBtn { left:116px; bottom:28px; width:58px; height:58px; }
+      #boostBtn { right:70px; bottom:124px; }
+      #upBtn { right:166px; bottom:124px; }
+      #downBtn { right:118px; bottom:124px; }
+      .controlLabel { bottom:120px; font-size:7px; }
+      #hint { display:none; }
+    }
+    @media (max-height:560px) and (pointer:coarse) {
+      .controlBase { width:86px; height:86px; bottom:10px; }
+      #lookBase { left:12px; }
+      #moveBase { right:12px; }
+      #fireBtn { left:112px; bottom:20px; width:54px; height:54px; }
+      #boostBtn { right:64px; bottom:142px; }
+      #upBtn { right:160px; bottom:142px; }
+      #downBtn { right:112px; bottom:142px; }
+      .controlLabel { display:none; }
+      #hint { display:none; }
+    }
+  </style>
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+  </script>
+</head>
+<body>
+  <div id="ui">
+    <div id="brand" class="panel">SKY DUEL<span>ARCADE AIRSHIP BATTLE</span></div>
+    <div id="stats" class="panel">
+      <div class="statline"><span>PLAYER HP</span><strong id="playerHpText">100</strong></div>
+      <div class="bar"><i id="playerHpBar"></i></div>
+      <div class="statline"><span>RIVAL HP</span><strong id="enemyHpText">100</strong></div>
+      <div class="bar"><i id="enemyHpBar"></i></div>
+      <div class="statline"><span>SCORE</span><strong id="scoreText">000</strong></div>
+      <div class="statline"><span>RANGE</span><strong id="rangeText">--</strong></div>
+    </div>
+    <div id="centerMark"><b></b></div>
+    <div id="notice"></div>
+    <div id="hint" class="panel">WASD / 矢印 : MOVE　 Q / E : UP / DOWN　 DRAG : LOOK　 CLICK : FIRE</div>
+    <div id="mobileControls">
+      <div id="lookLabel" class="controlLabel">LOOK</div>
+      <div id="moveLabel" class="controlLabel">MOVE</div>
+      <div id="lookBase" class="controlBase"><div id="lookStick" class="controlStick"></div></div>
+      <div id="moveBase" class="controlBase"><div id="moveStick" class="controlStick"></div></div>
+      <button id="fireBtn" class="mobileBtn">FIRE</button>
+      <button id="boostBtn" class="mobileBtn">BOOST</button>
+      <button id="upBtn" class="mobileBtn" aria-label="上昇">＋</button>
+      <button id="downBtn" class="mobileBtn" aria-label="下降">－</button>
+    </div>
+  </div>
+
+  <div id="startScreen">
+    <div id="startCard">
+      <div class="eyebrow">3D AIRSHIP BATTLE</div>
+      <h1>SKY DUEL</h1>
+      <p>巨大な飛行船を操り、雲海の上でライバル船と空中戦！<br>視点を動かして狙いを定め、エネルギー弾で撃墜しよう。</p>
+      <button id="startBtn">TAKE OFF</button>
+      <div id="controlNote">PC：WASDで移動 / Q・Eで上昇・下降 / マウスドラッグで視点 / 左クリックで射撃<br>スマホ：左スティックで視点・FIRE / 右スティックで移動 / ＋－で高度調整</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    const $ = (id) => document.getElementById(id);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x79bde0);
+    scene.fog = new THREE.Fog(0x9bcde4, 260, 1250);
+
+    const camera = new THREE.PerspectiveCamera(66, innerWidth/innerHeight, 0.1, 2400);
+    camera.position.set(0, 9, 20);
+    const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    document.body.prepend(renderer.domElement);
+
+    scene.add(new THREE.HemisphereLight(0xdff6ff, 0x46617a, 1.55));
+    const sun = new THREE.DirectionalLight(0xfff3d9, 2.0);
+    sun.position.set(-160, 240, 100);
+    scene.add(sun);
+
+    // Ocean-like distant reference surface; the airships remain high above it.
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(5000,5000), new THREE.MeshStandardMaterial({color:0x327a9b, roughness:.9, metalness:.05}));
+    sea.rotation.x = -Math.PI/2;
+    sea.position.y = -180;
+    scene.add(sea);
+
+    const cloudMat = new THREE.MeshStandardMaterial({color:0xf2fbff, roughness:1, transparent:true, opacity:.88});
+    const clouds = new THREE.Group();
+    scene.add(clouds);
+    for (let i=0;i<42;i++) {
+      const cluster = new THREE.Group();
+      const x = (Math.random()-.5)*1250, z=(Math.random()-.5)*1500;
+      const y = -70 + Math.random()*110;
+      const count = 4 + Math.floor(Math.random()*5);
+      for(let j=0;j<count;j++) {
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(10+Math.random()*16, 9, 7), cloudMat);
+        puff.position.set((Math.random()-.5)*35, Math.random()*13, (Math.random()-.5)*30);
+        puff.scale.y = .48 + Math.random()*.25;
+        cluster.add(puff);
+      }
+      cluster.position.set(x,y,z);
+      clouds.add(cluster);
+    }
+
+    const mat = (color, roughness=.55, metalness=.12, emissive=0x000000) => new THREE.MeshStandardMaterial({color,roughness,metalness,emissive});
+    const blueBody = mat(0x1687b8,.38,.42);
+    const blueWing = mat(0x0a527e,.42,.35);
+    const orangeBody = mat(0xe56f38,.4,.3);
+    const orangeWing = mat(0x873a36,.48,.25);
+    const glass = new THREE.MeshStandardMaterial({color:0x142c48, roughness:.12, metalness:.55, transparent:true, opacity:.9});
+
+    function makeAirship(envelopeMat, gondolaMat, accent=0x69eaff) {
+      const root = new THREE.Group();
+      // Large gas envelope: a long, rounded silhouette rather than an airplane fuselage.
+      const envelope = new THREE.Mesh(new THREE.SphereGeometry(1,24,18), envelopeMat);
+      envelope.scale.set(3.25,2.9,8.1);
+      root.add(envelope);
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(1,16,12), envelopeMat);
+      nose.scale.set(2.35,2.2,2.0);
+      nose.position.z=-6.5;
+      root.add(nose);
+      // Underslung passenger / weapon gondola.
+      const gondola = new THREE.Mesh(new THREE.BoxGeometry(2.15,1.05,4.25), gondolaMat);
+      gondola.position.set(0,-3.15,-.55);
+      root.add(gondola);
+      const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.85,.62,2.25), glass);
+      cabin.position.set(0,-2.76,-1.05);
+      root.add(cabin);
+      // Side windows and a pair of forward-facing gun housings.
+      for (const side of [-1,1]) {
+        const windowPane = new THREE.Mesh(new THREE.BoxGeometry(.08,.42,1.35), glass);
+        windowPane.position.set(side*1.09,-3.02,-.75);
+        root.add(windowPane);
+        const gun = new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,1.25,10), mat(0x263f55,.35,.65));
+        gun.rotation.x=Math.PI/2;
+        gun.position.set(side*.58,-3.2,-2.72);
+        root.add(gun);
+      }
+      // Tail stabilizers.
+      const tailH = new THREE.Mesh(new THREE.BoxGeometry(4.8,.24,1.55), gondolaMat);
+      tailH.position.set(0,.05,6.9);
+      root.add(tailH);
+      const tailV = new THREE.Mesh(new THREE.BoxGeometry(.25,2.8,1.55), gondolaMat);
+      tailV.position.set(0,1.25,6.9);
+      root.add(tailV);
+      // Two visible propellers, spinning while the airship moves.
+      const propellers=[];
+      for (const side of [-1,1]) {
+        const pod = new THREE.Mesh(new THREE.SphereGeometry(.62,12,10), gondolaMat);
+        pod.scale.set(1.25,.72,.95);
+        pod.position.set(side*3.2,-1.0,1.35);
+        root.add(pod);
+        const prop = new THREE.Group();
+        prop.position.set(side*3.85,-1.0,1.35);
+        const hub = new THREE.Mesh(new THREE.SphereGeometry(.22,10,8), mat(0xd7e8ed,.35,.65));
+        prop.add(hub);
+        const bladeMat = mat(0x263f55,.42,.48);
+        for(let i=0;i<3;i++) {
+          const blade = new THREE.Mesh(new THREE.BoxGeometry(.13,1.45,.28),bladeMat);
+          blade.rotation.x=i*Math.PI/3;
+          prop.add(blade);
+        }
+        root.add(prop);
+        propellers.push(prop);
+      }
+      const accentMat = new THREE.MeshBasicMaterial({color:accent});
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(.28,10,8),accentMat);
+      lamp.position.set(0,-2.55,-2.62);
+      root.add(lamp);
+      const glow = new THREE.PointLight(accent,.9,12);
+      glow.position.copy(lamp.position);
+      root.add(glow);
+      root.userData.propellers=propellers;
+      return root;
+    }
+
+    const player = makeAirship(blueBody,blueWing,0x69eaff);
+    player.position.set(0,45,0);
+    scene.add(player);
+    const enemy = makeAirship(orangeBody,orangeWing,0xffa45e);
+    enemy.position.set(20,60,-145);
+    scene.add(enemy);
+
+    // Small decorative target marker above the rival.
+    const targetRing = new THREE.Mesh(new THREE.TorusGeometry(5.8,.12,6,32), new THREE.MeshBasicMaterial({color:0xffb16e,transparent:true,opacity:.82}));
+    targetRing.position.y = 5.2;
+    enemy.add(targetRing);
+
+    const projectileGroup = new THREE.Group();
+    scene.add(projectileGroup);
+    const projectiles = [];
+    const shotGeo = new THREE.SphereGeometry(.38,8,8);
+    const playerShotMat = new THREE.MeshBasicMaterial({color:0x8cf5ff});
+    const enemyShotMat = new THREE.MeshBasicMaterial({color:0xffa06a});
+    const shotGlowMat = new THREE.MeshBasicMaterial({color:0x44dfff, transparent:true, opacity:.2});
+
+    const forward = (obj) => new THREE.Vector3(0,0,-1).applyQuaternion(obj.quaternion).normalize();
+    const up = (obj) => new THREE.Vector3(0,1,0).applyQuaternion(obj.quaternion).normalize();
+    const aimDirection = () => new THREE.Vector3(Math.sin(viewYaw)*Math.cos(viewPitch),Math.sin(viewPitch),-Math.cos(viewYaw)*Math.cos(viewPitch)).normalize();
+    let started=false, playerHp=100, enemyHp=100, score=0, fireCooldown=0, enemyFireCooldown=1.2;
+    let invulnerable=0, gameOverTimer=0, boostAmount=100;
+    const keys = Object.create(null);
+    const clock = new THREE.Clock();
+    let elapsed=0;
+    const playerVelocity = new THREE.Vector3();
+    const cameraTarget = new THREE.Vector3();
+    let viewYaw=0, viewPitch=0;
+    const desiredCam = new THREE.Vector3();
+    const tmp = new THREE.Vector3();
+
+    function spawnShot(owner, origin, direction) {
+      const mesh = new THREE.Mesh(shotGeo, owner==='player'?playerShotMat:enemyShotMat);
+      mesh.position.copy(origin);
+      const glow = new THREE.Mesh(shotGeo, shotGlowMat);
+      glow.scale.setScalar(2.8);
+      mesh.add(glow);
+      projectileGroup.add(mesh);
+      projectiles.push({mesh, direction:direction.clone().normalize(), speed:owner==='player'?255:170, life:2.6, owner});
+    }
+
+    function resetEnemy() {
+      const f=forward(player);
+      enemy.position.copy(player.position).add(f.multiplyScalar(185)).add(new THREE.Vector3((Math.random()-.5)*70, (Math.random()-.5)*38, 0));
+      enemy.quaternion.copy(player.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), Math.PI + (Math.random()-.5)*.5));
+      enemyHp=100;
+      enemyFireCooldown=1.0;
+      $('enemyHpText').textContent='100'; $('enemyHpBar').style.width='100%';
+    }
+
+    function showNotice(title, sub='') {
+      const n=$('notice'); n.innerHTML = `${title}${sub?`<small>${sub}</small>`:''}`; n.style.opacity='1';
+    }
+    function hideNotice(){ $('notice').style.opacity='0'; }
+
+    function damagePlayer(amount) {
+      if(invulnerable>0) return;
+      playerHp=Math.max(0,playerHp-amount);
+      invulnerable=0.32;
+      $('playerHpText').textContent=String(playerHp);
+      $('playerHpBar').style.width=playerHp+'%';
+      renderer.domElement.style.filter='brightness(1.35) saturate(1.25)';
+      setTimeout(()=>{renderer.domElement.style.filter='';},90);
+      if(playerHp<=0) {
+        gameOverTimer=2.1;
+        showNotice('AIRSHIP DOWN','立て直し中…');
+      }
+    }
+
+    function firePlayer() {
+      if(fireCooldown>0 || playerHp<=0) return;
+      const shotDir=aimDirection();
+      const origin=player.position.clone().add(new THREE.Vector3(0,-2.25,0)).add(shotDir.clone().multiplyScalar(4.2));
+      spawnShot('player',origin,shotDir);
+      fireCooldown=.16;
+    }
+
+    function fireEnemy() {
+      if(enemyFireCooldown>0 || playerHp<=0) return;
+      const f=forward(enemy);
+      const origin=enemy.position.clone().add(new THREE.Vector3(0,-2.2,0)).add(f.clone().multiplyScalar(4.5));
+      spawnShot('enemy',origin,f);
+      enemyFireCooldown=1.0+Math.random()*.42;
+    }
+
+    function updatePlayer(dt, moveX, moveY, vertical, boost) {
+      // The right stick moves the airship in its local horizontal plane.
+      const travelSpeed=boost && boostAmount>1 ? 105 : 72;
+      if(boost && boostAmount>0) boostAmount=Math.max(0,boostAmount-24*dt);
+      else boostAmount=Math.min(100,boostAmount+15*dt);
+      const localRight=new THREE.Vector3(1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0),player.rotation.y);
+      const localForward=new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0),player.rotation.y);
+      const desiredVelocity=new THREE.Vector3()
+        .addScaledVector(localRight,moveX*travelSpeed)
+        .addScaledVector(localForward,-moveY*travelSpeed)
+        .add(new THREE.Vector3(0,vertical*travelSpeed*.62,0));
+      if(desiredVelocity.length()>travelSpeed) desiredVelocity.normalize().multiplyScalar(travelSpeed);
+      playerVelocity.lerp(desiredVelocity,1-Math.exp(-dt*2.5));
+      player.position.addScaledVector(playerVelocity,dt);
+      player.position.y=THREE.MathUtils.clamp(player.position.y,12,155);
+      // An airship turns gently toward its movement direction and does not bank like a fighter.
+      const horizontalVelocity=new THREE.Vector3(playerVelocity.x,0,playerVelocity.z);
+      if(horizontalVelocity.length()>4) {
+        const desiredQ=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),horizontalVelocity.normalize());
+        player.quaternion.slerp(desiredQ,Math.min(1,dt*1.25));
+      }
+      player.rotation.z=THREE.MathUtils.lerp(player.rotation.z,-moveX*.10,Math.min(1,dt*1.8));
+      for(const prop of player.userData.propellers) prop.rotation.x+=dt*18;
+      // Recycle cloud clusters around the moving airship.
+      for(const c of clouds.children) {
+        if(c.position.distanceTo(player.position)>900) {
+          c.position.copy(player.position).add(new THREE.Vector3((Math.random()-.5)*1000,(Math.random()-.5)*220-70,(Math.random()-.5)*1100));
+        }
+      }
+    }
+
+    function updateEnemy(dt) {
+      if(playerHp<=0) return;
+      const toPlayer=player.position.clone().sub(enemy.position);
+      const distance=toPlayer.length();
+      const dir=toPlayer.normalize();
+      // Gentle lateral weaving keeps the duel readable and avoids perfect homing.
+      const side=new THREE.Vector3().crossVectors(dir,new THREE.Vector3(0,1,0)).normalize();
+      const weave=Math.sin(elapsed*1.45)*.34;
+      let desired=dir.clone().addScaledVector(side,weave).normalize();
+      if(distance<48) desired.multiplyScalar(-.72).addScaledVector(side,weave*.8).normalize();
+      const targetQ=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),desired);
+      enemy.quaternion.slerp(targetQ,Math.min(1,dt*1.35));
+      const ef=forward(enemy);
+      const speed=distance>105?67:(distance<42?59:49);
+      enemy.position.addScaledVector(ef,speed*dt);
+      enemy.position.y=THREE.MathUtils.clamp(enemy.position.y+Math.sin(elapsed*1.1)*dt*5,18,148);
+      for(const prop of enemy.userData.propellers) prop.rotation.x+=dt*18;
+      // Fire only when the nose is roughly pointed toward the player.
+      const aim=forward(enemy).dot(dir);
+      if(distance<175 && aim>.78) fireEnemy();
+    }
+
+    function updateShots(dt) {
+      for(let i=projectiles.length-1;i>=0;i--) {
+        const p=projectiles[i];
+        p.mesh.position.addScaledVector(p.direction,p.speed*dt);
+        p.life-=dt;
+        let remove=p.life<=0;
+        if(!remove && p.owner==='player' && enemyHp>0 && p.mesh.position.distanceTo(enemy.position)<7.0) {
+          enemyHp=Math.max(0,enemyHp-20);
+          $('enemyHpText').textContent=String(enemyHp);
+          $('enemyHpBar').style.width=enemyHp+'%';
+          remove=true;
+          if(enemyHp<=0) {
+            score+=100;
+            $('scoreText').textContent=String(score).padStart(3,'0');
+            showNotice('RIVAL DOWN','+100 POINTS　次の相手が接近中');
+            setTimeout(()=>{if(started)hideNotice();},1200);
+            resetEnemy();
+          }
+        } else if(!remove && p.owner==='enemy' && p.mesh.position.distanceTo(player.position)<6.8) {
+          damagePlayer(12);
+          remove=true;
+        }
+        if(remove) {
+          projectileGroup.remove(p.mesh);
+          p.mesh.geometry.dispose();
+          projectiles.splice(i,1);
+        }
+      }
+    }
+
+    function updateCamera(dt) {
+      const aim=aimDirection();
+      desiredCam.copy(player.position).addScaledVector(aim,-29).add(new THREE.Vector3(0,7,0));
+      camera.position.lerp(desiredCam,1-Math.pow(.0015,dt));
+      cameraTarget.copy(player.position).addScaledVector(aim,31).add(new THREE.Vector3(0,-1.5,0));
+      camera.lookAt(cameraTarget);
+      camera.fov=THREE.MathUtils.lerp(camera.fov,boostAmount<99 && (keys.ShiftLeft||keys.ShiftRight||mobileBoost)?70:64,Math.min(1,dt*2));
+      camera.updateProjectionMatrix();
+    }
+
+    function updateHUD() {
+      const d=player.position.distanceTo(enemy.position);
+      $('rangeText').textContent=Math.round(d)+' m';
+    }
+
+    // Keyboard and mouse controls (PC): WASD to move, Q/E altitude, drag to look, click to fire.
+    addEventListener('keydown', e=>{
+      keys[e.code]=true;
+      if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+    },{passive:false});
+    addEventListener('keyup', e=>{keys[e.code]=false;});
+    addEventListener('blur',()=>{for(const k in keys) keys[k]=false;mouseDragging=false;mouseFire=false;});
+
+    let mouseDragging=false, mouseFire=false, lastMouseX=0, lastMouseY=0;
+    renderer.domElement.addEventListener('pointerdown',e=>{
+      if(e.pointerType!=='mouse' || e.button!==0) return;
+      mouseDragging=true; mouseFire=true; lastMouseX=e.clientX; lastMouseY=e.clientY;
+      renderer.domElement.setPointerCapture(e.pointerId);
+      firePlayer();
+    });
+    renderer.domElement.addEventListener('pointermove',e=>{
+      if(!mouseDragging || e.pointerType!=='mouse') return;
+      const dx=e.clientX-lastMouseX, dy=e.clientY-lastMouseY;
+      lastMouseX=e.clientX; lastMouseY=e.clientY;
+      viewYaw-=dx*.0045;
+      viewPitch=THREE.MathUtils.clamp(viewPitch-dy*.004,-.72,.58);
+    });
+    const stopMouse=e=>{if(e.pointerType==='mouse'){mouseDragging=false;mouseFire=false;}};
+    renderer.domElement.addEventListener('pointerup',stopMouse);
+    renderer.domElement.addEventListener('pointercancel',stopMouse);
+    renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+
+    // Mobile: left thumb drags the view and holds FIRE; right thumb controls movement.
+    let lookPointer=null, lastLookX=0, lastLookY=0;
+    let movePointer=null, moveX=0, moveY=0, mobileFire=false, mobileBoost=false, mobileVertical=0;
+    const lookBase=$('lookBase'), lookStick=$('lookStick');
+    const moveBase=$('moveBase'), moveStick=$('moveStick');
+    lookBase.addEventListener('pointerdown',e=>{
+      lookPointer=e.pointerId; lastLookX=e.clientX; lastLookY=e.clientY;
+      lookBase.setPointerCapture(e.pointerId);
+    });
+    lookBase.addEventListener('pointermove',e=>{
+      if(e.pointerId!==lookPointer) return;
+      const dx=e.clientX-lastLookX, dy=e.clientY-lastLookY;
+      lastLookX=e.clientX; lastLookY=e.clientY;
+      viewYaw-=dx*.009;
+      viewPitch=THREE.MathUtils.clamp(viewPitch-dy*.008,-.72,.58);
+      const r=lookBase.getBoundingClientRect();
+      lookStick.style.transform=`translate(${THREE.MathUtils.clamp(e.clientX-(r.left+r.width/2),-r.width*.25,r.width*.25)}px,${THREE.MathUtils.clamp(e.clientY-(r.top+r.height/2),-r.height*.25,r.height*.25)}px)`;
+    });
+    function releaseLook(e){if(e.pointerId===lookPointer){lookPointer=null;lookStick.style.transform='translate(0px,0px)';}}
+    lookBase.addEventListener('pointerup',releaseLook); lookBase.addEventListener('pointercancel',releaseLook);
+
+    function moveMovementStick(e) {
+      const r=moveBase.getBoundingClientRect();
+      const dx=e.clientX-(r.left+r.width/2), dy=e.clientY-(r.top+r.height/2);
+      const max=r.width*.34, len=Math.hypot(dx,dy);
+      const scale=len>max?max/len:1;
+      const x=dx*scale, y=dy*scale;
+      moveX=x/max; moveY=y/max;
+      moveStick.style.transform=`translate(${x}px,${y}px)`;
+    }
+    moveBase.addEventListener('pointerdown',e=>{movePointer=e.pointerId;moveBase.setPointerCapture(e.pointerId);moveMovementStick(e);});
+    moveBase.addEventListener('pointermove',e=>{if(e.pointerId===movePointer)moveMovementStick(e);});
+    function releaseMove(e){if(e.pointerId===movePointer){movePointer=null;moveX=0;moveY=0;moveStick.style.transform='translate(0px,0px)';}}
+    moveBase.addEventListener('pointerup',releaseMove); moveBase.addEventListener('pointercancel',releaseMove);
+    const holdButton=(id,onChange)=>{
+      const el=$(id);
+      el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture(e.pointerId);onChange(true);el.classList.add('active');});
+      const end=()=>{onChange(false);el.classList.remove('active');};
+      el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);el.addEventListener('lostpointercapture',end);
+    };
+    holdButton('fireBtn',v=>mobileFire=v);
+    holdButton('boostBtn',v=>mobileBoost=v);
+    holdButton('upBtn',v=>mobileVertical=v?1:(mobileVertical>0?0:mobileVertical));
+    holdButton('downBtn',v=>mobileVertical=v?-1:(mobileVertical<0?0:mobileVertical));
+
+    function startGame() {
+      started=true;
+      $('startScreen').style.display='none';
+      playerHp=100; enemyHp=100; score=0; boostAmount=100; invulnerable=0;
+      $('playerHpText').textContent='100'; $('playerHpBar').style.width='100%';
+      $('enemyHpText').textContent='100'; $('enemyHpBar').style.width='100%';
+      $('scoreText').textContent='000';
+      player.position.set(0,45,0); player.rotation.set(0,0,0); playerVelocity.set(0,0,0);
+      viewYaw=0; viewPitch=0;
+      resetEnemy();
+      showNotice('TAKE OFF','敵機を追いかけよう');
+      setTimeout(()=>{if(started)hideNotice();},1000);
+      clock.getDelta();
+    }
+    $('startBtn').addEventListener('click',startGame);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt=Math.min(clock.getDelta(),.035);
+      if(!started){renderer.render(scene,camera);return;}
+      elapsed+=dt;
+      fireCooldown=Math.max(0,fireCooldown-dt);
+      enemyFireCooldown=Math.max(0,enemyFireCooldown-dt);
+      invulnerable=Math.max(0,invulnerable-dt);
+      if(playerHp<=0) {
+        gameOverTimer-=dt;
+        if(gameOverTimer<=0) {
+          playerHp=100; $('playerHpText').textContent='100'; $('playerHpBar').style.width='100%';
+          player.position.set(0,48,0); player.rotation.set(0,0,0); invulnerable=2;
+          resetEnemy(); hideNotice();
+        }
+      } else {
+        const left=keys.KeyA||keys.ArrowLeft, right=keys.KeyD||keys.ArrowRight;
+        const forwardKey=keys.KeyW||keys.ArrowUp, backKey=keys.KeyS||keys.ArrowDown;
+        const kx=(right?1:0)-(left?1:0);
+        const ky=(backKey?1:0)-(forwardKey?1:0);
+        const x=Math.abs(moveX)>.04?moveX:kx;
+        const y=Math.abs(moveY)>.04?moveY:ky;
+        const vertical=mobileVertical || ((keys.KeyE?1:0)-(keys.KeyQ?1:0));
+        const boosting=keys.ShiftLeft||keys.ShiftRight||mobileBoost;
+        updatePlayer(dt,x,y,vertical,boosting);
+        if(keys.Space||mouseFire||mobileFire) firePlayer();
+        updateEnemy(dt);
+      }
+      updateShots(dt);
+      updateCamera(dt);
+      updateHUD();
+      renderer.render(scene,camera);
+    }
+    addEventListener('resize',()=>{
+      camera.aspect=innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth,innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
+    });
+    animate();
+  </script>
+</body>
+</html>
