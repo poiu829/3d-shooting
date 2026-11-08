@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#071b31" />
+  <title>SKY DUEL - 3D Air Combat</title>
+  <style>
+    :root { color-scheme: dark; --cyan:#72e6ff; --panel:rgba(5,18,34,.66); --line:rgba(160,224,255,.22); }
+    * { box-sizing:border-box; }
+    html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#071b31; font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; touch-action:none; }
+    canvas { display:block; width:100%; height:100%; }
+    #ui { position:fixed; inset:0; color:#f3fbff; pointer-events:none; }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,.18); backdrop-filter:blur(8px); }
+    #brand { position:absolute; top:18px; left:20px; padding:10px 14px; letter-spacing:.16em; font-weight:900; font-size:14px; }
+    #brand span { display:block; color:#8fbbd3; font-size:9px; font-weight:600; letter-spacing:.22em; margin-top:3px; }
+    #stats { position:absolute; top:18px; right:20px; width:190px; padding:12px 14px; }
+    .statline { display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:11px; color:#a9c8da; margin-bottom:7px; }
+    .statline strong { color:white; font-size:13px; font-variant-numeric:tabular-nums; }
+    .bar { height:7px; border-radius:10px; background:rgba(255,255,255,.12); overflow:hidden; margin:5px 0 10px; }
+    .bar i { display:block; width:100%; height:100%; border-radius:10px; background:linear-gradient(90deg,#41d5ff,#8bffdb); transition:width .15s; }
+    #enemyBar { background:linear-gradient(90deg,#ff9c59,#ff5577); }
+    #centerMark { position:absolute; left:50%; top:50%; width:34px; height:34px; transform:translate(-50%,-50%); opacity:.8; }
+    #centerMark:before,#centerMark:after { content:""; position:absolute; background:#d7f7ff; box-shadow:0 0 8px #67e5ff; }
+    #centerMark:before { width:1px; height:34px; left:16px; top:0; }
+    #centerMark:after { height:1px; width:34px; top:16px; left:0; }
+    #centerMark b { position:absolute; width:8px; height:8px; border:1px solid #d7f7ff; border-radius:50%; top:12px; left:12px; }
+    #hint { position:absolute; left:50%; bottom:18px; transform:translateX(-50%); padding:8px 13px; color:#c6e0ed; font-size:11px; text-align:center; white-space:nowrap; }
+    #notice { position:absolute; left:50%; top:20%; transform:translate(-50%,-50%); font-size:clamp(22px,4vw,42px); font-weight:950; letter-spacing:.12em; text-shadow:0 4px 22px rgba(0,0,0,.4); opacity:0; transition:opacity .2s; text-align:center; }
+    #notice small { display:block; margin-top:8px; font-size:12px; letter-spacing:.08em; font-weight:600; color:#d4edf7; }
+    #startScreen { position:fixed; z-index:5; inset:0; display:grid; place-items:center; padding:22px; background:linear-gradient(180deg,rgba(5,20,38,.35),rgba(3,12,25,.82)); color:white; }
+    #startCard { pointer-events:auto; width:min(460px,100%); text-align:center; padding:28px 26px 24px; border:1px solid rgba(174,229,255,.25); border-radius:22px; background:rgba(5,20,37,.78); backdrop-filter:blur(14px); box-shadow:0 22px 80px rgba(0,0,0,.35); }
+    .eyebrow { color:#84dff4; font-size:10px; font-weight:800; letter-spacing:.28em; }
+    h1 { margin:9px 0 6px; font-size:clamp(34px,8vw,54px); font-weight:1000; letter-spacing:.08em; line-height:1; }
+    #startCard p { color:#aac6d9; font-size:13px; line-height:1.7; margin:13px 0 20px; }
+    #startBtn { border:0; border-radius:999px; padding:13px 34px; color:#032033; background:linear-gradient(100deg,#75e6ff,#8effd7); font-size:13px; font-weight:950; letter-spacing:.12em; cursor:pointer; box-shadow:0 8px 25px rgba(69,211,239,.22); }
+    #startBtn:active { transform:scale(.98); }
+    #controlNote { margin-top:18px; color:#8eabba; font-size:10px; line-height:1.8; }
+    #mobileControls { display:none; position:absolute; inset:0; pointer-events:none; }
+    #stickBase { pointer-events:auto; position:absolute; left:22px; bottom:24px; width:122px; height:122px; border-radius:50%; border:1px solid rgba(216,246,255,.38); background:rgba(9,35,55,.32); box-shadow:inset 0 0 25px rgba(120,220,255,.08); touch-action:none; }
+    #stick { position:absolute; left:50%; top:50%; width:50px; height:50px; margin:-25px; border-radius:50%; background:rgba(143,231,255,.55); border:1px solid rgba(236,252,255,.75); box-shadow:0 3px 16px rgba(0,0,0,.25); }
+    .mobileBtn { pointer-events:auto; position:absolute; right:24px; bottom:34px; width:76px; height:76px; border-radius:50%; border:1px solid rgba(255,255,255,.52); color:white; font-weight:900; font-size:11px; letter-spacing:.08em; background:rgba(28,117,153,.5); box-shadow:0 5px 22px rgba(0,0,0,.25); touch-action:none; }
+    #boostBtn { right:112px; bottom:48px; width:58px; height:58px; background:rgba(91,132,163,.42); font-size:9px; }
+    .mobileBtn.active { background:rgba(54,220,255,.7); }
+    #mobileLabel { position:absolute; left:25px; bottom:153px; font-size:9px; color:#d1e9f4; letter-spacing:.12em; text-shadow:0 1px 4px #000; }
+    @media (pointer:coarse), (max-width:700px) {
+      #mobileControls { display:block; }
+      #hint { bottom:160px; font-size:9px; }
+      #brand { top:10px; left:10px; padding:8px 10px; }
+      #stats { top:10px; right:10px; width:152px; padding:9px 10px; }
+      .statline { font-size:9px; margin-bottom:5px; }
+      .statline strong { font-size:11px; }
+      .bar { height:6px; margin:4px 0 7px; }
+    }
+    @media (max-height:560px) and (pointer:coarse) {
+      #stickBase { width:94px; height:94px; bottom:12px; left:14px; }
+      #stick { width:42px; height:42px; margin:-21px; }
+      .mobileBtn { width:62px; height:62px; right:15px; bottom:18px; }
+      #boostBtn { width:48px; height:48px; right:88px; bottom:25px; }
+      #mobileLabel { bottom:108px; left:18px; }
+      #hint { display:none; }
+    }
+  </style>
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+  </script>
+</head>
+<body>
+  <div id="ui">
+    <div id="brand" class="panel">SKY DUEL<span>ARCADE AIR COMBAT</span></div>
+    <div id="stats" class="panel">
+      <div class="statline"><span>PLAYER HP</span><strong id="playerHpText">100</strong></div>
+      <div class="bar"><i id="playerHpBar"></i></div>
+      <div class="statline"><span>RIVAL HP</span><strong id="enemyHpText">100</strong></div>
+      <div class="bar"><i id="enemyHpBar"></i></div>
+      <div class="statline"><span>SCORE</span><strong id="scoreText">000</strong></div>
+      <div class="statline"><span>RANGE</span><strong id="rangeText">--</strong></div>
+    </div>
+    <div id="centerMark"><b></b></div>
+    <div id="notice"></div>
+    <div id="hint" class="panel">WASD / ←↑↓→ : FLY　 SPACE : SHOOT　 SHIFT : BOOST</div>
+    <div id="mobileControls">
+      <div id="mobileLabel">DRAG TO STEER</div>
+      <div id="stickBase"><div id="stick"></div></div>
+      <button id="boostBtn" class="mobileBtn">BOOST</button>
+      <button id="fireBtn" class="mobileBtn">FIRE</button>
+    </div>
+  </div>
+
+  <div id="startScreen">
+    <div id="startCard">
+      <div class="eyebrow">3D ARCADE DOGFIGHT</div>
+      <h1>SKY DUEL</h1>
+      <p>雲の上を飛び回り、ライバル機との空中戦に挑もう。<br>相手の後ろを取り、エネルギー弾を当てて撃墜しよう！</p>
+      <button id="startBtn">TAKE OFF</button>
+      <div id="controlNote">PC：WASD または矢印キーで操縦 / Spaceで射撃 / Shiftでブースト<br>スマホ：左スティックで操縦 / FIRE・BOOSTボタン</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    const $ = (id) => document.getElementById(id);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x79bde0);
+    scene.fog = new THREE.Fog(0x9bcde4, 260, 1250);
+
+    const camera = new THREE.PerspectiveCamera(66, innerWidth/innerHeight, 0.1, 2400);
+    camera.position.set(0, 9, 20);
+    const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    document.body.prepend(renderer.domElement);
+
+    scene.add(new THREE.HemisphereLight(0xdff6ff, 0x46617a, 1.55));
+    const sun = new THREE.DirectionalLight(0xfff3d9, 2.0);
+    sun.position.set(-160, 240, 100);
+    scene.add(sun);
+
+    // Ocean-like distant reference surface; the aircraft remain high above it.
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(5000,5000), new THREE.MeshStandardMaterial({color:0x327a9b, roughness:.9, metalness:.05}));
+    sea.rotation.x = -Math.PI/2;
+    sea.position.y = -180;
+    scene.add(sea);
+
+    const cloudMat = new THREE.MeshStandardMaterial({color:0xf2fbff, roughness:1, transparent:true, opacity:.88});
+    const clouds = new THREE.Group();
+    scene.add(clouds);
+    for (let i=0;i<42;i++) {
+      const cluster = new THREE.Group();
+      const x = (Math.random()-.5)*1250, z=(Math.random()-.5)*1500;
+      const y = -70 + Math.random()*110;
+      const count = 4 + Math.floor(Math.random()*5);
+      for(let j=0;j<count;j++) {
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(10+Math.random()*16, 9, 7), cloudMat);
+        puff.position.set((Math.random()-.5)*35, Math.random()*13, (Math.random()-.5)*30);
+        puff.scale.y = .48 + Math.random()*.25;
+        cluster.add(puff);
+      }
+      cluster.position.set(x,y,z);
+      clouds.add(cluster);
+    }
+
+    const mat = (color, roughness=.55, metalness=.12, emissive=0x000000) => new THREE.MeshStandardMaterial({color,roughness,metalness,emissive});
+    const blueBody = mat(0x1687b8,.38,.42);
+    const blueWing = mat(0x0a527e,.42,.35);
+    const orangeBody = mat(0xe56f38,.4,.3);
+    const orangeWing = mat(0x873a36,.48,.25);
+    const glass = new THREE.MeshStandardMaterial({color:0x142c48, roughness:.12, metalness:.55, transparent:true, opacity:.9});
+
+    function makePlane(bodyMat, wingMat, accent=0x63e9ff) {
+      const root = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(.42,.58,4.4,12), bodyMat);
+      body.rotation.x = Math.PI/2;
+      body.position.z = .05;
+      root.add(body);
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(.43,1.45,12), bodyMat);
+      nose.rotation.x = -Math.PI/2;
+      nose.position.z = -2.85;
+      root.add(nose);
+      const tailcone = new THREE.Mesh(new THREE.ConeGeometry(.3,.75,10), wingMat);
+      tailcone.rotation.x = Math.PI/2;
+      tailcone.position.z = 2.45;
+      root.add(tailcone);
+      const wings = new THREE.Mesh(new THREE.BoxGeometry(7.4,.16,1.35), wingMat);
+      wings.position.set(0,-.03,-.12);
+      root.add(wings);
+      const wingTips = new THREE.Mesh(new THREE.BoxGeometry(1.0,.2,.55), bodyMat);
+      wingTips.position.set(0,.02,-.25);
+      root.add(wingTips);
+      const tail = new THREE.Mesh(new THREE.BoxGeometry(2.5,.13,.85), wingMat);
+      tail.position.set(0,.42,1.72);
+      root.add(tail);
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(.14,1.0,.95), wingMat);
+      fin.position.set(0,.83,1.62);
+      root.add(fin);
+      const cockpit = new THREE.Mesh(new THREE.SphereGeometry(.48,14,10), glass);
+      cockpit.scale.set(.72,.56,1.55);
+      cockpit.position.set(0,.45,-.72);
+      root.add(cockpit);
+      const engineMat = new THREE.MeshBasicMaterial({color:accent});
+      const engine = new THREE.Mesh(new THREE.SphereGeometry(.28,10,8), engineMat);
+      engine.position.set(0,0,2.48);
+      root.add(engine);
+      const glow = new THREE.PointLight(accent, 1.0, 9);
+      glow.position.set(0,0,2.6);
+      root.add(glow);
+      return root;
+    }
+
+    const player = makePlane(blueBody,blueWing,0x69eaff);
+    player.position.set(0,45,0);
+    scene.add(player);
+    const enemy = makePlane(orangeBody,orangeWing,0xffa45e);
+    enemy.position.set(20,60,-145);
+    scene.add(enemy);
+
+    // Small decorative target marker above the rival.
+    const targetRing = new THREE.Mesh(new THREE.TorusGeometry(5.3,.12,6,32), new THREE.MeshBasicMaterial({color:0xffb16e,transparent:true,opacity:.82}));
+    targetRing.position.y = 7.5;
+    enemy.add(targetRing);
+
+    const projectileGroup = new THREE.Group();
+    scene.add(projectileGroup);
+    const projectiles = [];
+    const shotGeo = new THREE.SphereGeometry(.38,8,8);
+    const playerShotMat = new THREE.MeshBasicMaterial({color:0x8cf5ff});
+    const enemyShotMat = new THREE.MeshBasicMaterial({color:0xffa06a});
+    const shotGlowMat = new THREE.MeshBasicMaterial({color:0x44dfff, transparent:true, opacity:.2});
+
+    const forward = (obj) => new THREE.Vector3(0,0,-1).applyQuaternion(obj.quaternion).normalize();
+    const up = (obj) => new THREE.Vector3(0,1,0).applyQuaternion(obj.quaternion).normalize();
+    let started=false, playerHp=100, enemyHp=100, score=0, fireCooldown=0, enemyFireCooldown=1.2;
+    let invulnerable=0, gameOverTimer=0, boostAmount=100;
+    const keys = Object.create(null);
+    const clock = new THREE.Clock();
+    let elapsed=0;
+    const playerVelocity = new THREE.Vector3();
+    const cameraTarget = new THREE.Vector3();
+    const desiredCam = new THREE.Vector3();
+    const tmp = new THREE.Vector3();
+
+    function spawnShot(owner, origin, direction) {
+      const mesh = new THREE.Mesh(shotGeo, owner==='player'?playerShotMat:enemyShotMat);
+      mesh.position.copy(origin);
+      const glow = new THREE.Mesh(shotGeo, shotGlowMat);
+      glow.scale.setScalar(2.8);
+      mesh.add(glow);
+      projectileGroup.add(mesh);
+      projectiles.push({mesh, direction:direction.clone().normalize(), speed:owner==='player'?235:155, life:2.3, owner});
+    }
+
+    function resetEnemy() {
+      const f=forward(player);
+      enemy.position.copy(player.position).add(f.multiplyScalar(145)).add(new THREE.Vector3((Math.random()-.5)*55, (Math.random()-.5)*30, 0));
+      enemy.quaternion.copy(player.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), Math.PI + (Math.random()-.5)*.5));
+      enemyHp=100;
+      enemyFireCooldown=1.0;
+      $('enemyHpText').textContent='100'; $('enemyHpBar').style.width='100%';
+    }
+
+    function showNotice(title, sub='') {
+      const n=$('notice'); n.innerHTML = `${title}${sub?`<small>${sub}</small>`:''}`; n.style.opacity='1';
+    }
+    function hideNotice(){ $('notice').style.opacity='0'; }
+
+    function damagePlayer(amount) {
+      if(invulnerable>0) return;
+      playerHp=Math.max(0,playerHp-amount);
+      invulnerable=0.32;
+      $('playerHpText').textContent=String(playerHp);
+      $('playerHpBar').style.width=playerHp+'%';
+      renderer.domElement.style.filter='brightness(1.35) saturate(1.25)';
+      setTimeout(()=>{renderer.domElement.style.filter='';},90);
+      if(playerHp<=0) {
+        gameOverTimer=2.1;
+        showNotice('AIRCRAFT DOWN','立て直し中…');
+      }
+    }
+
+    function firePlayer() {
+      if(fireCooldown>0 || playerHp<=0) return;
+      const f=forward(player);
+      const origin=player.position.clone().add(f.clone().multiplyScalar(3.2)).add(up(player).multiplyScalar(.05));
+      spawnShot('player',origin,f);
+      fireCooldown=.16;
+    }
+
+    function fireEnemy() {
+      if(enemyFireCooldown>0 || playerHp<=0) return;
+      const f=forward(enemy);
+      const origin=enemy.position.clone().add(f.clone().multiplyScalar(3.4));
+      spawnShot('enemy',origin,f);
+      enemyFireCooldown=1.0+Math.random()*.42;
+    }
+
+    function updatePlayer(dt, steerX, steerY, boost) {
+      const rollInput=steerX;
+      const pitchInput=-steerY;
+      const rollTarget=-rollInput*.78;
+      player.rotation.order='YXZ';
+      // Roll controls the turn; pitch remains direct and intentionally arcade-like.
+      player.rotation.z=THREE.MathUtils.lerp(player.rotation.z,rollTarget,Math.min(1,dt*3.8));
+      const yawRate=Math.sin(player.rotation.z)*1.12;
+      player.rotation.y += yawRate*dt;
+      player.rotation.x=THREE.MathUtils.lerp(player.rotation.x,pitchInput*.48,Math.min(1,dt*2.8));
+      const speed=boost && boostAmount>1 ? 112 : 82;
+      if(boost && boostAmount>0) boostAmount=Math.max(0,boostAmount-28*dt);
+      else boostAmount=Math.min(100,boostAmount+13*dt);
+      player.position.addScaledVector(forward(player),speed*dt);
+      // Keep the playfield comfortably bounded vertically.
+      player.position.y=THREE.MathUtils.clamp(player.position.y,12,145);
+      // Decorative clouds recycle ahead to keep the scene populated.
+      for(const c of clouds.children) {
+        if(c.position.distanceTo(player.position)>900) {
+          c.position.copy(player.position).add(new THREE.Vector3((Math.random()-.5)*1000,(Math.random()-.5)*220-70,(Math.random()-.5)*1100));
+        }
+      }
+    }
+
+    function updateEnemy(dt) {
+      if(playerHp<=0) return;
+      const toPlayer=player.position.clone().sub(enemy.position);
+      const distance=toPlayer.length();
+      const dir=toPlayer.normalize();
+      // Gentle lateral weaving keeps the duel readable and avoids perfect homing.
+      const side=new THREE.Vector3().crossVectors(dir,new THREE.Vector3(0,1,0)).normalize();
+      const weave=Math.sin(elapsed*1.45)*.34;
+      let desired=dir.clone().addScaledVector(side,weave).normalize();
+      if(distance<48) desired.multiplyScalar(-.72).addScaledVector(side,weave*.8).normalize();
+      const targetQ=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),desired);
+      enemy.quaternion.slerp(targetQ,Math.min(1,dt*1.35));
+      const ef=forward(enemy);
+      const speed=distance>105?67:(distance<42?59:49);
+      enemy.position.addScaledVector(ef,speed*dt);
+      enemy.position.y=THREE.MathUtils.clamp(enemy.position.y+Math.sin(elapsed*1.1)*dt*5,18,138);
+      // Fire only when the nose is roughly pointed toward the player.
+      const aim=forward(enemy).dot(dir);
+      if(distance<175 && aim>.78) fireEnemy();
+    }
+
+    function updateShots(dt) {
+      for(let i=projectiles.length-1;i>=0;i--) {
+        const p=projectiles[i];
+        p.mesh.position.addScaledVector(p.direction,p.speed*dt);
+        p.life-=dt;
+        let remove=p.life<=0;
+        if(!remove && p.owner==='player' && enemyHp>0 && p.mesh.position.distanceTo(enemy.position)<4.4) {
+          enemyHp=Math.max(0,enemyHp-20);
+          $('enemyHpText').textContent=String(enemyHp);
+          $('enemyHpBar').style.width=enemyHp+'%';
+          remove=true;
+          if(enemyHp<=0) {
+            score+=100;
+            $('scoreText').textContent=String(score).padStart(3,'0');
+            showNotice('RIVAL DOWN','+100 POINTS　次の相手が接近中');
+            setTimeout(()=>{if(started)hideNotice();},1200);
+            resetEnemy();
+          }
+        } else if(!remove && p.owner==='enemy' && p.mesh.position.distanceTo(player.position)<4.2) {
+          damagePlayer(12);
+          remove=true;
+        }
+        if(remove) {
+          projectileGroup.remove(p.mesh);
+          p.mesh.geometry.dispose();
+          projectiles.splice(i,1);
+        }
+      }
+    }
+
+    function updateCamera(dt) {
+      const f=forward(player), u=up(player);
+      desiredCam.copy(player.position).addScaledVector(f,-17).addScaledVector(u,6.2);
+      camera.position.lerp(desiredCam,1-Math.pow(.0015,dt));
+      cameraTarget.copy(player.position).addScaledVector(f,15).addScaledVector(u,1.4);
+      camera.lookAt(cameraTarget);
+      camera.fov=THREE.MathUtils.lerp(camera.fov, boostAmount<99 && (keys.ShiftLeft||keys.ShiftRight||mobileBoost)?72:66,Math.min(1,dt*2));
+      camera.updateProjectionMatrix();
+    }
+
+    function updateHUD() {
+      const d=player.position.distanceTo(enemy.position);
+      $('rangeText').textContent=Math.round(d)+' m';
+    }
+
+    // Keyboard input
+    addEventListener('keydown', e=>{
+      keys[e.code]=true;
+      if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+    },{passive:false});
+    addEventListener('keyup', e=>{keys[e.code]=false;});
+    addEventListener('blur',()=>{for(const k in keys) keys[k]=false;});
+
+    // Mobile thumbstick and buttons
+    let stickPointer=null, stickX=0, stickY=0, mobileFire=false, mobileBoost=false;
+    const base=$('stickBase'), stick=$('stick');
+    function moveStick(e) {
+      const r=base.getBoundingClientRect();
+      const cx=r.left+r.width/2, cy=r.top+r.height/2;
+      let dx=e.clientX-cx, dy=e.clientY-cy;
+      const max=r.width*.34, len=Math.hypot(dx,dy);
+      if(len>max){dx=dx/len*max;dy=dy/len*max;}
+      stickX=dx/max; stickY=dy/max;
+      stick.style.transform=`translate(${dx}px,${dy}px)`;
+    }
+    base.addEventListener('pointerdown',e=>{stickPointer=e.pointerId;base.setPointerCapture(e.pointerId);moveStick(e);});
+    base.addEventListener('pointermove',e=>{if(e.pointerId===stickPointer)moveStick(e);});
+    function releaseStick(e){if(e.pointerId===stickPointer){stickPointer=null;stickX=0;stickY=0;stick.style.transform='translate(0px,0px)';}}
+    base.addEventListener('pointerup',releaseStick); base.addEventListener('pointercancel',releaseStick);
+    const holdButton=(id,onChange)=>{
+      const el=$(id);
+      el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture(e.pointerId);onChange(true);el.classList.add('active');});
+      const end=e=>{onChange(false);el.classList.remove('active');};
+      el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);el.addEventListener('lostpointercapture',end);
+    };
+    holdButton('fireBtn',v=>mobileFire=v);
+    holdButton('boostBtn',v=>mobileBoost=v);
+
+    function startGame() {
+      started=true;
+      $('startScreen').style.display='none';
+      playerHp=100; enemyHp=100; score=0; boostAmount=100; invulnerable=0;
+      $('playerHpText').textContent='100'; $('playerHpBar').style.width='100%';
+      $('enemyHpText').textContent='100'; $('enemyHpBar').style.width='100%';
+      $('scoreText').textContent='000';
+      player.position.set(0,45,0); player.rotation.set(0,0,0);
+      resetEnemy();
+      showNotice('TAKE OFF','敵機を追いかけよう');
+      setTimeout(()=>{if(started)hideNotice();},1000);
+      clock.getDelta();
+    }
+    $('startBtn').addEventListener('click',startGame);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt=Math.min(clock.getDelta(),.035);
+      if(!started){renderer.render(scene,camera);return;}
+      elapsed+=dt;
+      fireCooldown=Math.max(0,fireCooldown-dt);
+      enemyFireCooldown=Math.max(0,enemyFireCooldown-dt);
+      invulnerable=Math.max(0,invulnerable-dt);
+      if(playerHp<=0) {
+        gameOverTimer-=dt;
+        if(gameOverTimer<=0) {
+          playerHp=100; $('playerHpText').textContent='100'; $('playerHpBar').style.width='100%';
+          player.position.set(0,48,0); player.rotation.set(0,0,0); invulnerable=2;
+          resetEnemy(); hideNotice();
+        }
+      } else {
+        const left=keys.KeyA||keys.ArrowLeft, right=keys.KeyD||keys.ArrowRight;
+        const upKey=keys.KeyW||keys.ArrowUp, downKey=keys.KeyS||keys.ArrowDown;
+        const kx=(right?1:0)-(left?1:0);
+        const ky=(downKey?1:0)-(upKey?1:0);
+        const x=Math.abs(stickX)>.04?stickX:kx;
+        const y=Math.abs(stickY)>.04?stickY:ky;
+        const boosting=keys.ShiftLeft||keys.ShiftRight||mobileBoost;
+        updatePlayer(dt,x,y,boosting);
+        if(keys.Space||mobileFire) firePlayer();
+        updateEnemy(dt);
+      }
+      updateShots(dt);
+      updateCamera(dt);
+      updateHUD();
+      renderer.render(scene,camera);
+    }
+    addEventListener('resize',()=>{
+      camera.aspect=innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth,innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
+    });
+    animate();
+  </script>
+</body>
+</html>
