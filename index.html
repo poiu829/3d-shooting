@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#071b31" />
+  <title>SKY DUEL - Space Builder</title>
+  <style>
+    :root { color-scheme: dark; --cyan:#72e6ff; --panel:rgba(5,12,30,.76); --line:rgba(130,190,255,.25); }
+    * { box-sizing:border-box; }
+    html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#030817; font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; touch-action:none; }
+    canvas { display:block; width:100%; height:100%; }
+    #ui { position:fixed; inset:0; color:#f3fbff; pointer-events:none; }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,.18); backdrop-filter:blur(8px); }
+    #brand { position:absolute; top:18px; left:20px; padding:10px 14px; letter-spacing:.16em; font-weight:900; font-size:14px; }
+    #brand span { display:block; color:#8fbbd3; font-size:9px; font-weight:600; letter-spacing:.22em; margin-top:3px; }
+    #stats { position:absolute; top:18px; right:20px; width:190px; padding:12px 14px; }
+    .statline { display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:11px; color:#a9c8da; margin-bottom:7px; }
+    .statline strong { color:white; font-size:13px; font-variant-numeric:tabular-nums; }
+    .bar { height:7px; border-radius:10px; background:rgba(255,255,255,.12); overflow:hidden; margin:5px 0 10px; }
+    .bar i { display:block; width:100%; height:100%; border-radius:10px; background:linear-gradient(90deg,#41d5ff,#8bffdb); transition:width .15s; }
+    #enemyBar { background:linear-gradient(90deg,#ff9c59,#ff5577); }
+    #buildBtn { position:absolute; left:20px; top:94px; pointer-events:auto; border:1px solid rgba(117,221,255,.45); border-radius:10px; padding:9px 14px; background:rgba(8,35,58,.82); color:#bcefff; font-weight:900; letter-spacing:.1em; font-size:10px; }
+    #buildBtn:active, #mineBtn:active { transform:scale(.97); }
+    #centerMark { position:absolute; left:50%; top:50%; width:34px; height:34px; transform:translate(-50%,-50%); opacity:.8; }
+    #centerMark:before,#centerMark:after { content:""; position:absolute; background:#d7f7ff; box-shadow:0 0 8px #67e5ff; }
+    #centerMark:before { width:1px; height:34px; left:16px; top:0; }
+    #centerMark:after { height:1px; width:34px; top:16px; left:0; }
+    #centerMark b { position:absolute; width:8px; height:8px; border:1px solid #d7f7ff; border-radius:50%; top:12px; left:12px; }
+    #hint { position:absolute; left:50%; bottom:18px; transform:translateX(-50%); padding:8px 13px; color:#c6e0ed; font-size:11px; text-align:center; white-space:nowrap; }
+    #mineStatus { position:absolute; left:50%; top:calc(50% + 30px); transform:translateX(-50%); color:#9eefff; font-size:11px; font-weight:800; text-shadow:0 2px 8px #000; white-space:nowrap; }
+    #notice { position:absolute; left:50%; top:20%; transform:translate(-50%,-50%); font-size:clamp(22px,4vw,42px); font-weight:950; letter-spacing:.12em; text-shadow:0 4px 22px rgba(0,0,0,.4); opacity:0; transition:opacity .2s; text-align:center; }
+    #notice small { display:block; margin-top:8px; font-size:12px; letter-spacing:.08em; font-weight:600; color:#d4edf7; }
+    #mineBtn { position:absolute; left:20px; bottom:24px; pointer-events:auto; border:1px solid rgba(120,235,255,.55); border-radius:12px; padding:12px 16px; color:#dffaff; font-size:11px; font-weight:900; letter-spacing:.1em; background:rgba(7,54,78,.82); }
+    #buildScreen { position:fixed; z-index:9; inset:0; display:none; place-items:center; padding:12px; background:rgba(2,7,18,.88); color:#eefaff; pointer-events:auto; }
+    #buildPanel { width:min(1020px,100%); max-height:96vh; overflow:auto; padding:16px; border:1px solid rgba(130,210,255,.3); border-radius:18px; background:linear-gradient(145deg,rgba(9,28,54,.98),rgba(5,12,29,.98)); box-shadow:0 20px 80px rgba(0,0,0,.55); }
+    #buildWorkspace { display:grid; grid-template-columns:minmax(0,1fr) minmax(230px,300px); gap:14px; align-items:start; }
+    #buildEditor { min-width:0; }
+    #layerBar { display:flex; align-items:center; justify-content:center; gap:12px; margin:0 auto 9px; color:#c9efff; font-size:12px; font-weight:900; }
+    #layerBar button { min-width:42px; border:1px solid rgba(132,220,255,.35); border-radius:8px; padding:7px 11px; background:rgba(17,55,82,.85); color:#e8faff; font-weight:900; }
+    #layerReadout { min-width:70px; text-align:center; letter-spacing:.08em; }
+    #buildGrid { margin-bottom:0; }
+    #buildPreviewWrap { min-width:0; border:1px solid rgba(132,205,242,.22); border-radius:12px; padding:9px; background:rgba(3,13,29,.62); }
+    #previewTitle { color:#a9d9eb; font-size:10px; font-weight:900; letter-spacing:.16em; margin:1px 2px 8px; }
+    #buildPreview { width:100%; height:260px; overflow:hidden; border-radius:8px; background:radial-gradient(ellipse at center,#18385a,#061023 72%); touch-action:none; }
+    #buildPreview canvas { width:100%; height:100%; display:block; }
+    #buildStats { margin:9px 2px 1px; color:#a9c8da; font-size:10px; line-height:1.7; white-space:pre-line; }
+    .buildCell.verticalUp { color:#93e6ff; border-color:rgba(115,224,255,.55); }
+    .buildCell.verticalDown { color:#f5c58b; border-color:rgba(245,197,139,.55); }
+    .buildCell.verticalBoth { color:#d4c0ff; border-color:rgba(212,192,255,.7); }
+    #buildHead { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+    #buildHead h2 { margin:0; font-size:20px; letter-spacing:.08em; }
+    #buildResources { color:#a9d9eb; font-size:12px; font-weight:700; }
+    #buildClose { border:1px solid rgba(255,255,255,.22); border-radius:9px; padding:8px 12px; background:rgba(255,255,255,.08); color:white; font-weight:800; }
+    #buildHelp { color:#9db8ca; font-size:11px; line-height:1.6; margin:8px 0 12px; }
+    #buildGrid { display:grid; grid-template-columns:repeat(9,minmax(0,1fr)); gap:4px; width:min(100%,430px); aspect-ratio:1; margin:0 auto 12px; }
+    .buildCell { min-width:0; border:1px solid rgba(144,190,220,.19); border-radius:5px; background:rgba(17,43,69,.72); color:#e7faff; font-size:clamp(10px,2.6vw,18px); display:grid; place-items:center; padding:0; }
+    .buildCell.empty { background:rgba(9,25,45,.66); }
+    .buildCell.core { border-color:#79e9ff; background:rgba(26,113,142,.7); }
+    .buildCell.engine { background:rgba(38,72,130,.85); border-color:#7aa9ff; }
+    .buildCell.gun { background:rgba(126,58,55,.85); border-color:#ff9e83; }
+    .buildCell.reactor { background:rgba(104,79,24,.85); border-color:#ffe08b; }
+    .buildCell.shield { background:rgba(28,111,105,.85); border-color:#7affdf; }
+    .buildCell.storage { background:rgba(93,74,113,.85); border-color:#d3a9ff; }
+    #partPalette { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+    .partChoice { border:1px solid rgba(143,203,232,.22); border-radius:9px; background:rgba(17,43,69,.8); color:#e6f7ff; padding:9px 6px; font-size:11px; font-weight:800; }
+    .partChoice.selected { border-color:#7aeaff; background:rgba(29,111,139,.7); box-shadow:0 0 0 1px rgba(122,234,255,.2) inset; }
+    #buildFooter { color:#9cb9c9; font-size:10px; text-align:center; margin-top:10px; }
+    #startScreen { position:fixed; z-index:5; inset:0; display:grid; place-items:center; padding:22px; background:linear-gradient(180deg,rgba(3,8,25,.25),rgba(2,7,18,.9)); color:white; }
+    #startCard { pointer-events:auto; width:min(490px,100%); text-align:center; padding:28px 26px 24px; border:1px solid rgba(174,229,255,.25); border-radius:22px; background:rgba(5,14,34,.86); backdrop-filter:blur(14px); box-shadow:0 22px 80px rgba(0,0,0,.35); }
+    .eyebrow { color:#84dff4; font-size:10px; font-weight:800; letter-spacing:.28em; }
+    h1 { margin:9px 0 6px; font-size:clamp(34px,8vw,54px); font-weight:1000; letter-spacing:.08em; line-height:1; }
+    #startCard p { color:#aac6d9; font-size:13px; line-height:1.7; margin:13px 0 20px; }
+    #startBtn { border:0; border-radius:999px; padding:13px 34px; color:#032033; background:linear-gradient(100deg,#75e6ff,#8effd7); font-size:13px; font-weight:950; letter-spacing:.12em; cursor:pointer; box-shadow:0 8px 25px rgba(69,211,239,.22); }
+    #startBtn:active { transform:scale(.98); }
+    #controlNote { margin-top:18px; color:#8eabba; font-size:10px; line-height:1.8; }
+    #mobileControls { display:none; position:absolute; inset:0; pointer-events:none; }
+    /* Touch pads are visual only; touch gestures are classified by where they begin. */
+    .controlBase { pointer-events:none; position:absolute; width:116px; height:116px; border-radius:50%; border:1px solid rgba(216,246,255,.38); background:rgba(9,35,55,.32); box-shadow:inset 0 0 25px rgba(120,220,255,.08); touch-action:none; }
+    #moveBase { display:none; left:0; top:0; transform:translate(-50%,-50%); border-color:rgba(142,255,206,.68); }
+    #fireBase { display:none; right:18px; bottom:18px; border-color:rgba(133,229,255,.68); background:rgba(9,35,55,.42); }
+    #fireBase:after { content:'FIRE'; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:rgba(225,249,255,.78); font-size:10px; font-weight:900; letter-spacing:.12em; pointer-events:none; }
+    .controlStick { position:absolute; left:50%; top:50%; width:48px; height:48px; margin:-24px; border-radius:50%; background:rgba(143,231,255,.55); border:1px solid rgba(236,252,255,.75); box-shadow:0 3px 16px rgba(0,0,0,.25); pointer-events:none; }
+    #moveStick { background:rgba(142,255,206,.58); }
+    #fireStick { background:rgba(75,218,255,.64); }
+    #fireBase.active { background:rgba(21,112,147,.55); border-color:rgba(150,245,255,.95); }
+    .mobileBtn { pointer-events:auto; position:absolute; border-radius:50%; border:1px solid rgba(255,255,255,.52); color:white; font-weight:900; font-size:10px; letter-spacing:.06em; background:rgba(28,117,153,.52); box-shadow:0 5px 22px rgba(0,0,0,.25); touch-action:none; }
+    #boostBtn { right:82px; bottom:154px; width:42px; height:42px; background:rgba(91,132,163,.48); font-size:8px; }
+    #upBtn, #downBtn { right:178px; bottom:154px; width:42px; height:42px; font-size:15px; }
+    #downBtn { right:130px; }
+    .mobileBtn.active { background:rgba(54,220,255,.78); }
+    .controlLabel { position:absolute; bottom:139px; font-size:8px; color:#d1e9f4; letter-spacing:.12em; text-shadow:0 1px 4px #000; }
+    #lookLabel, #moveLabel { display:none; }
+    @media (pointer:coarse), (max-width:700px) {
+      #buildBtn { top:64px; left:10px; padding:8px 10px; }
+      #mineBtn { left:10px; bottom:155px; padding:10px 12px; font-size:9px; }
+      #buildPanel { padding:12px; }
+      #buildWorkspace { grid-template-columns:minmax(0,1fr); gap:10px; }
+      #buildPreview { height:170px; }
+      #buildGrid { gap:3px; }
+      .partChoice { font-size:10px; padding:9px 3px; }
+    }
+    @media (pointer:coarse), (max-width:700px) {
+      #mobileControls { display:block; }
+      #fireBase { display:block; }
+      #moveBase { bottom:auto; }
+      #hint { bottom:146px; font-size:9px; white-space:normal; max-width:90vw; }
+      #brand { top:10px; left:10px; padding:8px 10px; }
+      #stats { top:10px; right:10px; width:152px; padding:9px 10px; }
+      .statline { font-size:9px; margin-bottom:5px; }
+      .statline strong { font-size:11px; }
+      .bar { height:6px; margin:4px 0 7px; }
+    }
+    @media (max-width:390px) {
+      .controlBase { width:98px; height:98px; bottom:16px; }
+      #fireBase { right:10px; bottom:14px; width:102px; height:102px; }
+      #moveBase { width:102px; height:102px; bottom:auto; }
+      .controlStick { width:42px; height:42px; margin:-21px; }
+      #boostBtn { right:70px; bottom:124px; }
+      #upBtn { right:166px; bottom:124px; }
+      #downBtn { right:118px; bottom:124px; }
+      .controlLabel { bottom:120px; font-size:7px; }
+      #hint { display:none; }
+    }
+    @media (max-width:390px) {
+      #mineBtn { bottom:130px; }
+      #buildGrid { gap:2px; }
+      #buildPreview { height:140px; }
+    }
+    @media (max-height:560px) and (pointer:coarse) {
+      .controlBase { width:86px; height:86px; bottom:10px; }
+      #fireBase { right:12px; bottom:10px; width:90px; height:90px; }
+      #moveBase { width:90px; height:90px; bottom:auto; }
+      #boostBtn { right:64px; bottom:142px; }
+      #upBtn { right:160px; bottom:142px; }
+      #downBtn { right:112px; bottom:142px; }
+      .controlLabel { display:none; }
+      #hint { display:none; }
+    }
+  </style>
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+  </script>
+</head>
+<body>
+  <div id="ui">
+    <div id="brand" class="panel">SKY DUEL<span>SPACE BUILDER / EXPLORER</span></div>
+    <button id="buildBtn">SHIP DESIGN</button>
+    <div id="stats" class="panel">
+      <div class="statline"><span>PLAYER HP</span><strong id="playerHpText">100</strong></div>
+      <div class="bar"><i id="playerHpBar"></i></div>
+      <div class="statline"><span>RIVAL HP</span><strong id="enemyHpText">100</strong></div>
+      <div class="bar"><i id="enemyHpBar"></i></div>
+      <div class="statline"><span>SCORE</span><strong id="scoreText">000</strong></div>
+      <div class="statline"><span>RANGE</span><strong id="rangeText">--</strong></div>
+      <div class="statline"><span>METAL / CRYSTAL</span><strong id="resourceText">18 / 8</strong></div>
+    </div>
+    <div id="centerMark"><b></b></div>
+    <div id="notice"></div>
+    <div id="mineStatus"></div>
+    <button id="mineBtn">HOLD TO MINE</button>
+    <div id="hint" class="panel">PC：WASDで移動　Q / Eで高度調整　マウスドラッグで視点　クリックで射撃　Fで採掘<br>スマホ：左スティックで移動　右下FIREで射撃　右側ドラッグで視点　HOLD TO MINEで採掘</div>
+    <div id="mobileControls">
+      <div id="moveBase" class="controlBase"><div id="moveStick" class="controlStick"></div></div>
+      <div id="fireBase" class="controlBase"><div id="fireStick" class="controlStick"></div></div>
+      <button id="boostBtn" class="mobileBtn">BOOST</button>
+      <button id="upBtn" class="mobileBtn" aria-label="上昇">＋</button>
+      <button id="downBtn" class="mobileBtn" aria-label="下降">－</button>
+    </div>
+  </div>
+
+  <div id="buildScreen">
+    <div id="buildPanel">
+      <div id="buildHead"><div><h2>SHIP WORKSHOP</h2><div id="buildResources">METAL 18　/　CRYSTAL 8</div></div><button id="buildClose">CLOSE</button></div>
+      <div id="buildHelp">Y階層を切り替えながら、X-Z平面のマスに部品を配置します。上下の部品も隣接していれば接続できます。配置済みの部品をタップすると取り外せます（コアは取り外せません）。右側の3Dプレビューはドラッグで回転できます。</div>
+      <div id="buildWorkspace">
+        <div id="buildEditor">
+          <div id="layerBar"><button id="layerDown" type="button">Y −</button><strong id="layerReadout">Y = 0</strong><button id="layerUp" type="button">Y ＋</button></div>
+          <div id="buildGrid" aria-label="宇宙船設計グリッド"></div>
+        </div>
+        <div id="buildPreviewWrap">
+          <div id="previewTitle">3D SHIP PREVIEW · DRAG TO ROTATE</div>
+          <div id="buildPreview"></div>
+          <div id="buildStats">BLOCKS 5 · HEIGHT 1</div>
+        </div>
+      </div>
+      <div id="partPalette">
+        <button class="partChoice selected" data-part="hull">▦ 船体<br><small>金属 1</small></button>
+        <button class="partChoice" data-part="engine">◆ エンジン<br><small>金属 4 / 結晶 1</small></button>
+        <button class="partChoice" data-part="gun">✦ 武器<br><small>金属 3 / 結晶 2</small></button>
+        <button class="partChoice" data-part="reactor">◉ 発電機<br><small>金属 5 / 結晶 1</small></button>
+        <button class="partChoice" data-part="shield">◇ シールド<br><small>金属 3 / 結晶 2</small></button>
+        <button class="partChoice" data-part="storage">▣ 貯蔵庫<br><small>金属 2</small></button>
+      </div>
+      <div id="buildFooter">コアは必須部品です。エンジン＝速度、武器＝攻撃力、シールド・船体＝防御、発電機＝ブースト回復に影響します。</div>
+    </div>
+  </div>
+
+  <div id="startScreen">
+    <div id="startCard">
+      <div class="eyebrow">3D SPACE SANDBOX</div>
+      <h1>SKY DUEL</h1>
+      <p>小惑星帯を探索して資材を採掘し、自分だけの宇宙船を設計。<br>武装を整えて、ライバル船との宇宙戦闘に挑もう。</p>
+      <button id="startBtn">TAKE OFF</button>
+      <div id="controlNote">PC：WASDで移動 / Q・Eで上昇・下降 / マウスドラッグで視点 / 左クリックで射撃 / Fで採掘<br>スマホ：左側スティックで移動 / 右下FIREで射撃 / 右側をドラッグして視点操作 / HOLD TO MINEで採掘</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    const $ = (id) => document.getElementById(id);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x030817);
+    scene.fog = new THREE.Fog(0x030817, 1450, 2800);
+
+    const camera = new THREE.PerspectiveCamera(66, innerWidth/innerHeight, 0.1, 4200);
+    camera.position.set(0, 9, 20);
+    const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    document.body.prepend(renderer.domElement);
+
+    scene.add(new THREE.HemisphereLight(0x8dbbff, 0x11182b, 1.05));
+    const sun = new THREE.DirectionalLight(0xfff3d9, 2.0);
+    sun.position.set(-160, 240, 100);
+    scene.add(sun);
+
+    // Deep-space starfield and a procedural asteroid belt.
+    const starPositions=[];
+    for(let i=0;i<2600;i++) {
+      const theta=Math.random()*Math.PI*2;
+      const phi=Math.acos(2*Math.random()-1);
+      const radius=900+Math.random()*1750;
+      starPositions.push(radius*Math.sin(phi)*Math.cos(theta),radius*Math.cos(phi),radius*Math.sin(phi)*Math.sin(theta));
+    }
+    const starGeometry=new THREE.BufferGeometry();
+    starGeometry.setAttribute('position',new THREE.Float32BufferAttribute(starPositions,3));
+    const starMaterial=new THREE.PointsMaterial({color:0xd8edff,size:1.8,sizeAttenuation:false,transparent:true,opacity:.9});
+    const stars=new THREE.Points(starGeometry,starMaterial);
+    scene.add(stars);
+
+    const distantNebula=new THREE.Mesh(new THREE.SphereGeometry(1750,24,16),new THREE.MeshBasicMaterial({color:0x13264c,side:THREE.BackSide,transparent:true,opacity:.13}));
+    scene.add(distantNebula);
+
+    const mat = (color, roughness=.55, metalness=.12, emissive=0x000000) => new THREE.MeshStandardMaterial({color,roughness,metalness,emissive});
+    const blueBody = mat(0x1687b8,.38,.52);
+    const blueWing = mat(0x0a527e,.42,.48);
+    const orangeBody = mat(0xe56f38,.4,.42);
+    const orangeWing = mat(0x873a36,.48,.35);
+    const glass = new THREE.MeshStandardMaterial({color:0x142c48, roughness:.12, metalness:.55, transparent:true, opacity:.9});
+
+    const asteroidField=new THREE.Group();
+    scene.add(asteroidField);
+    const asteroidRockMat=new THREE.MeshStandardMaterial({color:0x626a7c,roughness:.98,metalness:.16,flatShading:true});
+    const asteroidOreMat=new THREE.MeshStandardMaterial({color:0x4bb9ba,roughness:.48,metalness:.65,emissive:0x104c55,emissiveIntensity:.5});
+    const asteroidGoldMat=new THREE.MeshStandardMaterial({color:0xc18e48,roughness:.5,metalness:.65,emissive:0x39210a,emissiveIntensity:.3});
+    const asteroids=[];
+    function placeAsteroid(record,around) {
+      const center=around || new THREE.Vector3();
+      const angle=Math.random()*Math.PI*2, radius=170+Math.random()*760;
+      record.mesh.position.set(center.x+Math.cos(angle)*radius,center.y+(Math.random()-.5)*480,center.z+Math.sin(angle)*radius);
+      record.mesh.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+      record.mesh.visible=true; record.mined=false; record.respawn=0;
+    }
+    function createAsteroid() {
+      const group=new THREE.Group();
+      const scale=5+Math.random()*10;
+      const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(scale,1),asteroidRockMat);
+      rock.scale.set(.8+Math.random()*.55,.7+Math.random()*.55,.8+Math.random()*.55);
+      group.add(rock);
+      for(let i=0;i<3;i++) {
+        const ore=new THREE.Mesh(new THREE.IcosahedronGeometry(scale*(.12+Math.random()*.1),0),Math.random()<.55?asteroidOreMat:asteroidGoldMat);
+        const a=Math.random()*Math.PI*2, h=(Math.random()-.5)*scale;
+        ore.position.set(Math.cos(a)*scale*.68,h,Math.sin(a)*scale*.68);
+        group.add(ore);
+      }
+      asteroidField.add(group);
+      const record={mesh:group,mined:false,respawn:0,scale};
+      asteroids.push(record);
+      return record;
+    }
+    for(let i=0;i<64;i++) { const a=createAsteroid(); placeAsteroid(a,new THREE.Vector3()); }
+
+    const partInfo={
+      core:{cost:{metal:0,crystal:0},label:'コア',symbol:'◎'},
+      hull:{cost:{metal:1,crystal:0},label:'船体',symbol:'▦'},
+      engine:{cost:{metal:4,crystal:1},label:'エンジン',symbol:'◆'},
+      gun:{cost:{metal:3,crystal:2},label:'武器',symbol:'✦'},
+      reactor:{cost:{metal:5,crystal:1},label:'発電機',symbol:'◉'},
+      shield:{cost:{metal:3,crystal:2},label:'シールド',symbol:'◇'},
+      storage:{cost:{metal:2,crystal:0},label:'貯蔵庫',symbol:'▣'}
+    };
+    const resources={metal:18,crystal:8};
+    let shipBlocks=[
+      {x:4,y:0,z:4,type:'core'},{x:4,y:0,z:5,type:'engine'},{x:3,y:0,z:4,type:'hull'},
+      {x:5,y:0,z:4,type:'hull'},{x:4,y:0,z:3,type:'gun'}
+    ];
+    let buildLayer=0;
+    const MIN_BUILD_LAYER=-4, MAX_BUILD_LAYER=4;
+    let buildMode=false, selectedPart='hull', mineHeld=false, miningProgress=0;
+    function loadProgress() {
+      try {
+        const saved=JSON.parse(localStorage.getItem('sky-duel-space-save-v1')||'null');
+        if(!saved || !Array.isArray(saved.shipBlocks) || !saved.resources) return;
+        const valid=[];
+        const occupied=new Set();
+        for(const raw of saved.shipBlocks) {
+          const b={...raw,y:Number.isInteger(raw.y)?raw.y:0};
+          const key=`${b.x},${b.y},${b.z}`;
+          if(Number.isInteger(b.x)&&Number.isInteger(b.z)&&b.x>=0&&b.x<9&&b.z>=0&&b.z<9&&b.y>=MIN_BUILD_LAYER&&b.y<=MAX_BUILD_LAYER&&partInfo[b.type]&&!occupied.has(key)) {
+            valid.push(b); occupied.add(key);
+          }
+        }
+        if(valid.some(b=>b.type==='core')) shipBlocks=valid;
+        resources.metal=Math.max(0,Math.floor(Number(saved.resources.metal)||0));
+        resources.crystal=Math.max(0,Math.floor(Number(saved.resources.crystal)||0));
+      } catch(_) {}
+    }
+    function saveProgress() {
+      try { localStorage.setItem('sky-duel-space-save-v1',JSON.stringify({shipBlocks,resources})); } catch(_) {}
+    }
+    loadProgress();
+
+    function makeSpaceShip(teamColor,accentColor) {
+      const root=new THREE.Group();
+      root.userData.propellers=[];
+      root.userData.engineGlows=[];
+      root.userData.teamColor=teamColor;
+      root.userData.accentColor=accentColor;
+      return root;
+    }
+    function clearGroup(group) {
+      while(group.children.length) {
+        const child=group.children[0];
+        group.remove(child);
+        child.traverse?.(node=>{ if(node.geometry) node.geometry.dispose(); });
+      }
+    }
+    function buildShipVisual(root,blocks) {
+      clearGroup(root);
+      root.userData.engineGlows=[];
+      const team=root.userData.teamColor, accent=root.userData.accentColor;
+      for(const block of blocks) {
+        const x=(block.x-4)*2.25, y=(block.y||0)*2.25, z=(block.z-4)*2.25;
+        const type=block.type;
+        const baseColor=type==='core'?team:type==='hull'?0x52677f:type==='engine'?0x294d70:type==='gun'?0x744b4e:type==='reactor'?0x79652f:type==='shield'?0x236a70:0x5b4c70;
+        const blockMat=new THREE.MeshStandardMaterial({color:baseColor,roughness:.48,metalness:.58,emissive:type==='reactor'?0x6b3e0c:0x000000,emissiveIntensity:.45});
+        const body=new THREE.Mesh(new THREE.BoxGeometry(2.05,1.35,2.05),blockMat);
+        body.position.set(x,y,z); root.add(body);
+        const panel=new THREE.Mesh(new THREE.BoxGeometry(1.62,.12,1.62),new THREE.MeshStandardMaterial({color:accent,metalness:.5,roughness:.4,emissive:accent,emissiveIntensity:.12}));
+        panel.position.set(x,y+.74,z); root.add(panel);
+        if(type==='core') {
+          const dome=new THREE.Mesh(new THREE.SphereGeometry(.82,16,12),glass);
+          dome.scale.set(1,.72,1.15); dome.position.set(x,y+1.02,z-.22); root.add(dome);
+        } else if(type==='engine') {
+          const nozzle=new THREE.Mesh(new THREE.CylinderGeometry(.48,.65,1.45,10),mat(0x27384b,.36,.7));
+          nozzle.rotation.x=Math.PI/2; nozzle.position.set(x,y-.05,z+1.05); root.add(nozzle);
+          const flame=new THREE.Mesh(new THREE.ConeGeometry(.43,1.55,10),new THREE.MeshBasicMaterial({color:accent,transparent:true,opacity:.66}));
+          flame.rotation.x=-Math.PI/2; flame.position.set(x,y-.05,z+2.1); root.add(flame); root.userData.engineGlows.push(flame);
+        } else if(type==='gun') {
+          const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.17,.22,1.75,10),mat(0x263746,.34,.8));
+          barrel.rotation.x=Math.PI/2; barrel.position.set(x,y+.05,z-1.55); root.add(barrel);
+          const muzzle=new THREE.Mesh(new THREE.SphereGeometry(.24,10,8),new THREE.MeshBasicMaterial({color:accent}));
+          muzzle.position.set(x,y+.05,z-2.45); root.add(muzzle);
+        } else if(type==='reactor') {
+          const core=new THREE.Mesh(new THREE.OctahedronGeometry(.62,0),new THREE.MeshStandardMaterial({color:0xffc85a,emissive:0xff9d26,emissiveIntensity:1.4,metalness:.4}));
+          core.position.set(x,y+.95,z); root.add(core);
+        } else if(type==='shield') {
+          const ring=new THREE.Mesh(new THREE.TorusGeometry(.72,.1,8,20),new THREE.MeshBasicMaterial({color:0x77ffe4,transparent:true,opacity:.82}));
+          ring.position.set(x,y+1.05,z); root.add(ring);
+        } else if(type==='storage') {
+          const latch=new THREE.Mesh(new THREE.BoxGeometry(.95,.18,.18),mat(0xc4a4db,.45,.55));
+          latch.position.set(x,y+.84,z); root.add(latch);
+        }
+      }
+      root.userData.propellers=[];
+    }
+
+    const player = makeSpaceShip(0x1687b8,0x69eaff);
+    player.position.set(0,0,0);
+    buildShipVisual(player,shipBlocks);
+    scene.add(player);
+    const enemy = makeSpaceShip(0xe56f38,0xffa45e);
+    const enemyBlocks=[{x:4,z:4,type:'core'},{x:4,z:5,type:'engine'},{x:3,z:4,type:'hull'},{x:5,z:4,type:'hull'},{x:4,z:3,type:'gun'},{x:2,z:4,type:'gun'},{x:6,z:4,type:'gun'}];
+    buildShipVisual(enemy,enemyBlocks);
+    enemy.position.set(20,15,-145);
+    scene.add(enemy);
+    for(const asteroid of asteroids) placeAsteroid(asteroid,player.position);
+
+    // Small decorative target marker above the rival.
+    const targetRing = new THREE.Mesh(new THREE.TorusGeometry(6.8,.12,6,32), new THREE.MeshBasicMaterial({color:0xffb16e,transparent:true,opacity:.82}));
+    targetRing.position.y = 3.2;
+    enemy.add(targetRing);
+
+    const projectileGroup = new THREE.Group();
+    scene.add(projectileGroup);
+    const projectiles = [];
+    const shotGeo = new THREE.SphereGeometry(.38,8,8);
+    const playerShotMat = new THREE.MeshBasicMaterial({color:0x8cf5ff});
+    const enemyShotMat = new THREE.MeshBasicMaterial({color:0xffa06a});
+    const shotGlowMat = new THREE.MeshBasicMaterial({color:0x44dfff, transparent:true, opacity:.2});
+
+    const forward = (obj) => new THREE.Vector3(0,0,-1).applyQuaternion(obj.quaternion).normalize();
+    const up = (obj) => new THREE.Vector3(0,1,0).applyQuaternion(obj.quaternion).normalize();
+    const aimDirection = () => new THREE.Vector3(Math.sin(viewYaw)*Math.cos(viewPitch),Math.sin(viewPitch),-Math.cos(viewYaw)*Math.cos(viewPitch)).normalize();
+    let started=false, playerHp=100, enemyHp=100, score=0, fireCooldown=0, enemyFireCooldown=1.2;
+    let invulnerable=0, gameOverTimer=0, boostAmount=100;
+    const keys = Object.create(null);
+    const clock = new THREE.Clock();
+    let elapsed=0;
+    const playerVelocity = new THREE.Vector3();
+    const cameraTarget = new THREE.Vector3();
+    let viewYaw=0, viewPitch=0;
+    const desiredCam = new THREE.Vector3();
+    const tmp = new THREE.Vector3();
+
+    function spawnShot(owner, origin, direction) {
+      const mesh = new THREE.Mesh(shotGeo, owner==='player'?playerShotMat:enemyShotMat);
+      mesh.position.copy(origin);
+      const glow = new THREE.Mesh(shotGeo, shotGlowMat);
+      glow.scale.setScalar(2.8);
+      mesh.add(glow);
+      projectileGroup.add(mesh);
+      projectiles.push({mesh, direction:direction.clone().normalize(), speed:owner==='player'?255:170, life:2.6, owner});
+    }
+
+    function resetEnemy() {
+      const f=forward(player);
+      enemy.position.copy(player.position).add(f.multiplyScalar(185)).add(new THREE.Vector3((Math.random()-.5)*70, (Math.random()-.5)*90, 0));
+      enemy.quaternion.copy(player.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), Math.PI + (Math.random()-.5)*.5));
+      enemyHp=100;
+      enemyFireCooldown=1.0;
+      $('enemyHpText').textContent='100'; $('enemyHpBar').style.width='100%';
+    }
+
+    function showNotice(title, sub='') {
+      const n=$('notice'); n.innerHTML = `${title}${sub?`<small>${sub}</small>`:''}`; n.style.opacity='1';
+    }
+    function hideNotice(){ $('notice').style.opacity='0'; }
+
+    function damagePlayer(amount) {
+      if(invulnerable>0) return;
+      const shieldCount=shipBlocks.filter(b=>b.type==='shield').length;
+      const armorCount=shipBlocks.filter(b=>b.type==='hull').length;
+      const reduced=amount*Math.max(.48,1-shieldCount*.13-armorCount*.025);
+      playerHp=Math.max(0,playerHp-reduced);
+      invulnerable=0.32;
+      $('playerHpText').textContent=String(playerHp);
+      $('playerHpBar').style.width=playerHp+'%';
+      renderer.domElement.style.filter='brightness(1.35) saturate(1.25)';
+      setTimeout(()=>{renderer.domElement.style.filter='';},90);
+      if(playerHp<=0) {
+        gameOverTimer=2.1;
+        showNotice('SHIP DESTROYED','再起動中…');
+      }
+    }
+
+    function firePlayer() {
+      if(fireCooldown>0 || playerHp<=0) return;
+      const shotDir=aimDirection();
+      const origin=player.position.clone().add(new THREE.Vector3(0,.1,0)).add(shotDir.clone().multiplyScalar(4.2));
+      spawnShot('player',origin,shotDir);
+      fireCooldown=.16;
+    }
+
+    function fireEnemy() {
+      if(enemyFireCooldown>0 || playerHp<=0) return;
+      const f=forward(enemy);
+      const origin=enemy.position.clone().add(new THREE.Vector3(0,.1,0)).add(f.clone().multiplyScalar(4.5));
+      spawnShot('enemy',origin,f);
+      enemyFireCooldown=1.0+Math.random()*.42;
+    }
+
+    function updatePlayer(dt, moveX, moveY, vertical, boost) {
+      // Arcade-style 3D movement: sideways, forward/back, and vertical translation.
+      const engineCount=shipBlocks.filter(b=>b.type==='engine').length;
+      const reactorCount=shipBlocks.filter(b=>b.type==='reactor').length;
+      const cruiseSpeed=72+engineCount*7;
+      const travelSpeed=boost && boostAmount>1 ? cruiseSpeed*1.48 : cruiseSpeed;
+      if(boost && boostAmount>0) boostAmount=Math.max(0,boostAmount-24*dt);
+      else boostAmount=Math.min(100,boostAmount+(15+reactorCount*4)*dt);
+      const localRight=new THREE.Vector3(1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0),player.rotation.y);
+      const localForward=new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0),player.rotation.y);
+      const desiredVelocity=new THREE.Vector3()
+        .addScaledVector(localRight,moveX*travelSpeed)
+        .addScaledVector(localForward,-moveY*travelSpeed)
+        .add(new THREE.Vector3(0,vertical*travelSpeed*.62,0));
+      if(desiredVelocity.length()>travelSpeed) desiredVelocity.normalize().multiplyScalar(travelSpeed);
+      playerVelocity.lerp(desiredVelocity,1-Math.exp(-dt*2.5));
+      player.position.addScaledVector(playerVelocity,dt);
+      player.position.y=THREE.MathUtils.clamp(player.position.y,-320,320);
+      // An airship turns gently toward its movement direction and does not bank like a fighter.
+      const horizontalVelocity=new THREE.Vector3(playerVelocity.x,0,playerVelocity.z);
+      if(horizontalVelocity.length()>4) {
+        const desiredQ=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),horizontalVelocity.normalize());
+        player.quaternion.slerp(desiredQ,Math.min(1,dt*1.25));
+      }
+      player.rotation.z=THREE.MathUtils.lerp(player.rotation.z,-moveX*.10,Math.min(1,dt*1.8));
+      for(const prop of player.userData.propellers) prop.rotation.x+=dt*18;
+      for(const flame of player.userData.engineGlows) flame.scale.setScalar(.85+Math.random()*.25);
+      stars.position.copy(player.position);
+      distantNebula.position.copy(player.position);
+    }
+
+    function updateEnemy(dt) {
+      if(playerHp<=0) return;
+      const toPlayer=player.position.clone().sub(enemy.position);
+      const distance=toPlayer.length();
+      const dir=toPlayer.normalize();
+      // Gentle lateral weaving keeps the duel readable and avoids perfect homing.
+      const side=new THREE.Vector3().crossVectors(dir,new THREE.Vector3(0,1,0)).normalize();
+      const weave=Math.sin(elapsed*1.45)*.34;
+      let desired=dir.clone().addScaledVector(side,weave).normalize();
+      if(distance<48) desired.multiplyScalar(-.72).addScaledVector(side,weave*.8).normalize();
+      const targetQ=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),desired);
+      enemy.quaternion.slerp(targetQ,Math.min(1,dt*1.35));
+      const ef=forward(enemy);
+      const speed=distance>105?67:(distance<42?59:49);
+      enemy.position.addScaledVector(ef,speed*dt);
+      enemy.position.y=THREE.MathUtils.clamp(enemy.position.y+Math.sin(elapsed*1.1)*dt*15,-250,250);
+      for(const flame of enemy.userData.engineGlows) flame.scale.setScalar(.88+Math.random()*.18);
+      // Fire only when the nose is roughly pointed toward the player.
+      const aim=forward(enemy).dot(dir);
+      if(distance<175 && aim>.78) fireEnemy();
+    }
+
+    function updateShots(dt) {
+      for(let i=projectiles.length-1;i>=0;i--) {
+        const p=projectiles[i];
+        p.mesh.position.addScaledVector(p.direction,p.speed*dt);
+        p.life-=dt;
+        let remove=p.life<=0;
+        if(!remove && p.owner==='player' && enemyHp>0 && p.mesh.position.distanceTo(enemy.position)<8.5) {
+          const gunCount=shipBlocks.filter(b=>b.type==='gun').length;
+          enemyHp=Math.max(0,enemyHp-(14+gunCount*6));
+          $('enemyHpText').textContent=String(enemyHp);
+          $('enemyHpBar').style.width=enemyHp+'%';
+          remove=true;
+          if(enemyHp<=0) {
+            score+=100;
+            $('scoreText').textContent=String(score).padStart(3,'0');
+            showNotice('RIVAL DOWN','+100 POINTS　次の相手が接近中');
+            setTimeout(()=>{if(started)hideNotice();},1200);
+            resetEnemy();
+          }
+        } else if(!remove && p.owner==='enemy' && p.mesh.position.distanceTo(player.position)<8.5) {
+          damagePlayer(12);
+          remove=true;
+        }
+        if(remove) {
+          projectileGroup.remove(p.mesh);
+          p.mesh.geometry.dispose();
+          projectiles.splice(i,1);
+        }
+      }
+    }
+
+    function updateCamera(dt) {
+      const aim=aimDirection();
+      desiredCam.copy(player.position).addScaledVector(aim,-32).add(new THREE.Vector3(0,9,0));
+      camera.position.lerp(desiredCam,1-Math.pow(.0015,dt));
+      cameraTarget.copy(player.position).addScaledVector(aim,32).add(new THREE.Vector3(0,0,0));
+      camera.lookAt(cameraTarget);
+      camera.fov=THREE.MathUtils.lerp(camera.fov,boostAmount<99 && (keys.ShiftLeft||keys.ShiftRight||mobileBoost)?70:64,Math.min(1,dt*2));
+      camera.updateProjectionMatrix();
+    }
+
+    function updateResourceHUD() {
+      $('resourceText').textContent=`${resources.metal} / ${resources.crystal}`;
+      $('buildResources').textContent=`METAL ${resources.metal}　/　CRYSTAL ${resources.crystal}`;
+    }
+    function nearestMineable() {
+      let nearest=null, best=Infinity;
+      for(const a of asteroids) if(a.mesh.visible) {
+        const d=a.mesh.position.distanceTo(player.position);
+        if(d<best){best=d;nearest=a;}
+      }
+      return best<34?{asteroid:nearest,distance:best}:null;
+    }
+    function updateMining(dt) {
+      const target=nearestMineable();
+      if(mineHeld && target) {
+        miningProgress+=dt;
+        $('mineStatus').textContent=`MINING ${(Math.min(1,miningProgress/1.35)*100).toFixed(0)}%`;
+        if(miningProgress>=1.35) {
+          const a=target.asteroid;
+          a.mesh.visible=false; a.mined=true; a.respawn=22+Math.random()*12;
+          const cargoBonus=shipBlocks.filter(b=>b.type==='storage').length*2;
+          const metal=2+Math.floor(Math.random()*4)+cargoBonus;
+          const crystal=Math.random()<.42?1+Math.floor(Math.random()*2):0;
+          resources.metal+=metal; resources.crystal+=crystal;
+          miningProgress=0; updateResourceHUD(); saveProgress();
+          $('mineStatus').textContent=`+${metal} METAL  +${crystal} CRYSTAL`;
+        }
+      } else {
+        miningProgress=0;
+        $('mineStatus').textContent=target?`MINING RANGE ${Math.round(target.distance)}m`:'小惑星に近づいて採掘';
+      }
+    }
+    function updateAsteroidField(dt) {
+      for(const a of asteroids) {
+        if(a.mined) {
+          a.respawn-=dt;
+          if(a.respawn<=0) placeAsteroid(a,player.position);
+        } else {
+          a.mesh.rotation.x+=dt*.025; a.mesh.rotation.y+=dt*.04;
+          if(a.mesh.position.distanceTo(player.position)>1250) placeAsteroid(a,player.position);
+        }
+      }
+    }
+    function isAdjacentToShip(x,y,z,blocks=shipBlocks) {
+      return blocks.some(b=>Math.abs(b.x-x)+Math.abs((b.y||0)-y)+Math.abs(b.z-z)===1);
+    }
+    function isShipConnected(blocks) {
+      const core=blocks.find(b=>b.type==='core');
+      if(!core) return false;
+      const key=b=>`${b.x},${b.y||0},${b.z}`;
+      const byKey=new Map(blocks.map(b=>[key(b),b]));
+      const visited=new Set([key(core)]), queue=[core];
+      const dirs=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+      for(let i=0;i<queue.length;i++) {
+        const b=queue[i];
+        for(const [dx,dy,dz] of dirs) {
+          const next=byKey.get(`${b.x+dx},${(b.y||0)+dy},${b.z+dz}`);
+          if(next&&!visited.has(key(next))) { visited.add(key(next)); queue.push(next); }
+        }
+      }
+      return visited.size===blocks.length;
+    }
+    function updateBuildLayer() {
+      $('layerReadout').textContent=`Y = ${buildLayer}`;
+      $('layerDown').disabled=buildLayer<=MIN_BUILD_LAYER;
+      $('layerUp').disabled=buildLayer>=MAX_BUILD_LAYER;
+      $('layerDown').style.opacity=buildLayer<=MIN_BUILD_LAYER?'.35':'1';
+      $('layerUp').style.opacity=buildLayer>=MAX_BUILD_LAYER?'.35':'1';
+    }
+    function updateBuildStats() {
+      const ys=shipBlocks.map(b=>b.y||0);
+      const height=ys.length?Math.max(...ys)-Math.min(...ys)+1:0;
+      const count=t=>shipBlocks.filter(b=>b.type===t).length;
+      $('buildStats').textContent=`BLOCKS ${shipBlocks.length} · HEIGHT ${height} LAYERS\nENGINES ${count('engine')} · WEAPONS ${count('gun')} · SHIELDS ${count('shield')}`;
+    }
+    function renderBuildGrid() {
+      const grid=$('buildGrid'); grid.innerHTML='';
+      const byKey=new Map(shipBlocks.filter(b=>(b.y||0)===buildLayer).map(b=>[`${b.x},${b.z}`,b]));
+      for(let z=0;z<9;z++) for(let x=0;x<9;x++) {
+        const block=byKey.get(`${x},${z}`);
+        const above=shipBlocks.some(b=>b.x===x&&b.z===z&&(b.y||0)===buildLayer+1);
+        const below=shipBlocks.some(b=>b.x===x&&b.z===z&&(b.y||0)===buildLayer-1);
+        const verticalHint=!block?(above&&below?'↕':above?'↑':below?'↓':''):'';
+        const verticalClass=!block?(above&&below?'verticalBoth':above?'verticalUp':below?'verticalDown':''):'';
+        const cell=document.createElement('button');
+        cell.type='button'; cell.className=`buildCell ${block?block.type:'empty'} ${verticalClass}`;
+        cell.textContent=block?partInfo[block.type].symbol:verticalHint;
+        cell.title=block?`${partInfo[block.type].label} (X${x}, Y${buildLayer}, Z${z})`:above||below?`上下の階層に部品があります (X${x}, Y${buildLayer}, Z${z})`:`配置 (X${x}, Y${buildLayer}, Z${z})`;
+        cell.addEventListener('click',()=>{
+          const exists=shipBlocks.find(b=>b.x===x&&b.z===z&&(b.y||0)===buildLayer);
+          if(exists) {
+            if(exists.type==='core') { $('buildFooter').textContent='コアは取り外せません。'; return; }
+            const nextBlocks=shipBlocks.filter(b=>b!==exists);
+            if(!isShipConnected(nextBlocks)) { $('buildFooter').textContent='この部品を外すと船体が分離します。先に外側の部品を取り外してください。'; return; }
+            const cost=partInfo[exists.type].cost;
+            resources.metal+=Math.floor(cost.metal*.5);
+            resources.crystal+=Math.floor(cost.crystal*.5);
+            shipBlocks=nextBlocks;
+            buildShipVisual(player,shipBlocks); previewDirty=true; updateResourceHUD(); saveProgress(); renderBuildGrid(); return;
+          }
+          if(!isAdjacentToShip(x,buildLayer,z)) { $('buildFooter').textContent='同じ階層または上下の部品に隣接するマスを選んでください。'; return; }
+          const cost=partInfo[selectedPart].cost;
+          if(resources.metal<cost.metal||resources.crystal<cost.crystal) { $('buildFooter').textContent='資材が足りません。小惑星を採掘してください。'; return; }
+          resources.metal-=cost.metal; resources.crystal-=cost.crystal;
+          shipBlocks.push({x,y:buildLayer,z,type:selectedPart});
+          buildShipVisual(player,shipBlocks); previewDirty=true; updateResourceHUD(); saveProgress();
+          $('buildFooter').textContent=`${partInfo[selectedPart].label}を Y=${buildLayer} に配置しました。`;
+          renderBuildGrid();
+        });
+        grid.appendChild(cell);
+      }
+      updateBuildLayer(); updateBuildStats(); updateShipPreview();
+    }
+    function openBuild() {
+      if(!started) return;
+      buildMode=true; $('buildScreen').style.display='grid'; renderBuildGrid(); updateResourceHUD(); resizeShipPreview();
+    }
+    function closeBuild() {
+      buildMode=false; $('buildScreen').style.display='none';
+    }
+    $('buildBtn').addEventListener('click',openBuild);
+    $('buildClose').addEventListener('click',closeBuild);
+    $('layerDown').addEventListener('click',()=>{buildLayer=Math.max(MIN_BUILD_LAYER,buildLayer-1);renderBuildGrid();});
+    $('layerUp').addEventListener('click',()=>{buildLayer=Math.min(MAX_BUILD_LAYER,buildLayer+1);renderBuildGrid();});
+    document.querySelectorAll('.partChoice').forEach(button=>button.addEventListener('click',()=>{
+      selectedPart=button.dataset.part;
+      document.querySelectorAll('.partChoice').forEach(b=>b.classList.toggle('selected',b===button));
+      $('buildFooter').textContent=`${partInfo[selectedPart].label}を選択中です。グリッドの空きマスを選んで配置してください。`;
+    }));
+    // Dedicated 3D preview renderer for the workshop.
+    const previewScene=new THREE.Scene();
+    previewScene.background=new THREE.Color(0x07162a);
+    previewScene.add(new THREE.HemisphereLight(0x9bcfff,0x1b2840,1.65));
+    const previewKeyLight=new THREE.DirectionalLight(0xffffff,2.2); previewKeyLight.position.set(-10,18,14); previewScene.add(previewKeyLight);
+    const previewFillLight=new THREE.PointLight(0x4acfff,28,90); previewFillLight.position.set(12,5,-10); previewScene.add(previewFillLight);
+    const previewCamera=new THREE.PerspectiveCamera(42,1,.1,500);
+    const previewRoot=makeSpaceShip(0x1687b8,0x69eaff); previewScene.add(previewRoot);
+    const previewRenderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
+    previewRenderer.setPixelRatio(Math.min(devicePixelRatio,1.35));
+    previewRenderer.outputColorSpace=THREE.SRGBColorSpace;
+    previewRenderer.toneMapping=THREE.ACESFilmicToneMapping;
+    previewRenderer.toneMappingExposure=1.1;
+    $('buildPreview').appendChild(previewRenderer.domElement);
+    let previewYaw=.55, previewPitch=.38, previewDragging=false, previewPointerX=0, previewPointerY=0;
+    let previewDirty=true;
+    const previewCenter=new THREE.Vector3();
+    const previewSize=new THREE.Vector3(8,8,8);
+    function updateShipPreview() {
+      if(previewDirty) {
+        previewRoot.position.set(0,0,0);
+        buildShipVisual(previewRoot,shipBlocks);
+        const bounds=new THREE.Box3().setFromObject(previewRoot);
+        previewCenter.copy(bounds.getCenter(new THREE.Vector3()));
+        previewSize.copy(bounds.getSize(new THREE.Vector3()));
+        previewDirty=false;
+      }
+      const radius=Math.max(previewSize.x,previewSize.y,previewSize.z,8);
+      const distance=radius*2.35+8;
+      const cp=Math.cos(previewPitch);
+      previewRoot.position.set(-previewCenter.x,-previewCenter.y,-previewCenter.z);
+      previewCamera.position.set(Math.sin(previewYaw)*cp*distance,Math.sin(previewPitch)*distance,Math.cos(previewYaw)*cp*distance);
+      previewCamera.lookAt(0,0,0);
+      previewCamera.near=Math.max(.1,distance/100); previewCamera.far=distance*20; previewCamera.updateProjectionMatrix();
+      $('buildStats').textContent=`BLOCKS ${shipBlocks.length} · SIZE ${Math.ceil(previewSize.x/2.25)}×${Math.ceil(previewSize.y/2.25)}×${Math.ceil(previewSize.z/2.25)}\nENGINES ${shipBlocks.filter(b=>b.type==='engine').length} · WEAPONS ${shipBlocks.filter(b=>b.type==='gun').length} · SHIELDS ${shipBlocks.filter(b=>b.type==='shield').length}`;
+    }
+    function resizeShipPreview() {
+      const host=$('buildPreview');
+      const w=Math.max(1,host.clientWidth), h=Math.max(1,host.clientHeight);
+      previewRenderer.setSize(w,h,false); previewCamera.aspect=w/h; previewCamera.updateProjectionMatrix();
+    }
+    const previewCanvas=previewRenderer.domElement;
+    previewCanvas.addEventListener('pointerdown',e=>{previewDragging=true;previewPointerX=e.clientX;previewPointerY=e.clientY;previewCanvas.setPointerCapture(e.pointerId);});
+    previewCanvas.addEventListener('pointermove',e=>{if(!previewDragging)return;const dx=e.clientX-previewPointerX,dy=e.clientY-previewPointerY;previewPointerX=e.clientX;previewPointerY=e.clientY;previewYaw+=dx*.009;previewPitch=THREE.MathUtils.clamp(previewPitch+dy*.007,-1.1,1.1);updateShipPreview();});
+    const stopPreviewDrag=()=>previewDragging=false;
+    previewCanvas.addEventListener('pointerup',stopPreviewDrag); previewCanvas.addEventListener('pointercancel',stopPreviewDrag); previewCanvas.addEventListener('lostpointercapture',stopPreviewDrag);
+    $('mineBtn').addEventListener('pointerdown',e=>{e.preventDefault();mineHeld=true;try{$('mineBtn').setPointerCapture(e.pointerId);}catch(_){}});
+    const stopMine=()=>mineHeld=false;
+    $('mineBtn').addEventListener('pointerup',stopMine);
+    $('mineBtn').addEventListener('pointercancel',stopMine);
+    $('mineBtn').addEventListener('lostpointercapture',stopMine);
+    addEventListener('keydown',e=>{if(e.code==='KeyF') mineHeld=true; if(e.code==='KeyB' && started) openBuild();});
+    addEventListener('keyup',e=>{if(e.code==='KeyF') mineHeld=false;});
+
+    function updateHUD() {
+      const d=player.position.distanceTo(enemy.position);
+      $('rangeText').textContent=Math.round(d)+' m';
+    }
+
+    // Keyboard and mouse controls (PC): WASD to move, Q/E altitude, drag to look, click to fire.
+    addEventListener('keydown', e=>{
+      keys[e.code]=true;
+      if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+    },{passive:false});
+    addEventListener('keyup', e=>{keys[e.code]=false;});
+    addEventListener('blur',()=>{for(const k in keys) keys[k]=false;mouseDragging=false;mouseFire=false;mobileFire=false;movePointer=null;lookPointer=null;firePointer=null;moveX=0;moveY=0;moveBase.style.display='none';fireBase.classList.remove('active');});
+
+    let mouseDragging=false, mouseFire=false, lastMouseX=0, lastMouseY=0;
+    renderer.domElement.addEventListener('pointerdown',e=>{
+      if(e.pointerType!=='mouse' || e.button!==0) return;
+      mouseDragging=true; mouseFire=true; lastMouseX=e.clientX; lastMouseY=e.clientY;
+      renderer.domElement.setPointerCapture(e.pointerId);
+      firePlayer();
+    });
+    renderer.domElement.addEventListener('pointermove',e=>{
+      if(!mouseDragging || e.pointerType!=='mouse') return;
+      const dx=e.clientX-lastMouseX, dy=e.clientY-lastMouseY;
+      lastMouseX=e.clientX; lastMouseY=e.clientY;
+      viewYaw-=dx*.0045;
+      viewPitch=THREE.MathUtils.clamp(viewPitch-dy*.004,-.72,.58);
+    });
+    const stopMouse=e=>{if(e.pointerType==='mouse'){mouseDragging=false;mouseFire=false;}};
+    renderer.domElement.addEventListener('pointerup',stopMouse);
+    renderer.domElement.addEventListener('pointercancel',stopMouse);
+    renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+
+    // Mobile touch layout:
+    // - A touch starting on the left half creates a movement stick exactly at that point.
+    // - A touch starting inside the bottom-right FIRE pad holds automatic fire.
+    // - Any other touch starting on the right half controls the camera view.
+    let lookPointer=null, lastLookX=0, lastLookY=0;
+    let movePointer=null, moveOriginX=0, moveOriginY=0;
+    let firePointer=null, moveX=0, moveY=0, mobileFire=false, mobileBoost=false, mobileVertical=0;
+    const moveBase=$('moveBase'), moveStick=$('moveStick');
+    const fireBase=$('fireBase'), fireStick=$('fireStick');
+
+    function moveMovementStick(e) {
+      const dx=e.clientX-moveOriginX, dy=e.clientY-moveOriginY;
+      const max=46, len=Math.hypot(dx,dy), scale=len>max?max/len:1;
+      const x=dx*scale, y=dy*scale;
+      moveX=THREE.MathUtils.clamp(x/max,-1,1);
+      moveY=THREE.MathUtils.clamp(y/max,-1,1);
+      moveStick.style.transform=`translate(${x}px,${y}px)`;
+    }
+    function moveFireStick(e) {
+      const r=fireBase.getBoundingClientRect();
+      const cx=r.left+r.width/2, cy=r.top+r.height/2;
+      const dx=e.clientX-cx, dy=e.clientY-cy;
+      const max=r.width*.27, len=Math.hypot(dx,dy), scale=len>max?max/len:1;
+      fireStick.style.transform=`translate(${dx*scale}px,${dy*scale}px)`;
+    }
+    function beganOnFirePad(x,y) {
+      const r=fireBase.getBoundingClientRect();
+      const cx=r.left+r.width/2, cy=r.top+r.height/2;
+      return x>=r.left && x<=r.right && y>=r.top && y<=r.bottom && Math.hypot(x-cx,y-cy)<=Math.min(r.width,r.height)*.52;
+    }
+    renderer.domElement.addEventListener('pointerdown',e=>{
+      if(e.pointerType==='mouse' || e.pointerType==='') return;
+      e.preventDefault();
+      if(e.clientX < innerWidth*.5) {
+        if(movePointer!==null) return;
+        movePointer=e.pointerId;
+        moveOriginX=e.clientX; moveOriginY=e.clientY;
+        moveBase.style.left=`${moveOriginX}px`;
+        moveBase.style.top=`${moveOriginY}px`;
+        moveBase.style.display='block';
+        moveStick.style.transform='translate(0px,0px)';
+        moveMovementStick(e);
+      } else if(beganOnFirePad(e.clientX,e.clientY)) {
+        if(firePointer!==null) return;
+        firePointer=e.pointerId;
+        mobileFire=true;
+        fireBase.classList.add('active');
+        moveFireStick(e);
+      } else {
+        if(lookPointer!==null) return;
+        lookPointer=e.pointerId;
+        lastLookX=e.clientX; lastLookY=e.clientY;
+      }
+      try { renderer.domElement.setPointerCapture(e.pointerId); } catch (_) {}
+    },{passive:false});
+
+    renderer.domElement.addEventListener('pointermove',e=>{
+      if(e.pointerType==='mouse' || e.pointerType==='') return;
+      if(e.pointerId===movePointer) {
+        e.preventDefault();
+        moveMovementStick(e);
+      } else if(e.pointerId===firePointer) {
+        e.preventDefault();
+        moveFireStick(e);
+      } else if(e.pointerId===lookPointer) {
+        e.preventDefault();
+        const dx=e.clientX-lastLookX, dy=e.clientY-lastLookY;
+        lastLookX=e.clientX; lastLookY=e.clientY;
+        viewYaw-=dx*.009;
+        viewPitch=THREE.MathUtils.clamp(viewPitch-dy*.008,-.72,.58);
+      }
+    },{passive:false});
+
+    function releaseTouchControl(e) {
+      if(e.pointerId===movePointer) {
+        movePointer=null; moveX=0; moveY=0;
+        moveBase.style.display='none';
+        moveStick.style.transform='translate(0px,0px)';
+      }
+      if(e.pointerId===firePointer) {
+        firePointer=null; mobileFire=false;
+        fireBase.classList.remove('active');
+        fireStick.style.transform='translate(0px,0px)';
+      }
+      if(e.pointerId===lookPointer) lookPointer=null;
+    }
+    renderer.domElement.addEventListener('pointerup',releaseTouchControl);
+    renderer.domElement.addEventListener('pointercancel',releaseTouchControl);
+    renderer.domElement.addEventListener('lostpointercapture',releaseTouchControl);
+    const holdButton=(id,onChange)=>{
+      const el=$(id);
+      el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture(e.pointerId);onChange(true);el.classList.add('active');});
+      const end=()=>{onChange(false);el.classList.remove('active');};
+      el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);el.addEventListener('lostpointercapture',end);
+    };
+    holdButton('boostBtn',v=>mobileBoost=v);
+    holdButton('upBtn',v=>mobileVertical=v?1:(mobileVertical>0?0:mobileVertical));
+    holdButton('downBtn',v=>mobileVertical=v?-1:(mobileVertical<0?0:mobileVertical));
+
+    function startGame() {
+      started=true;
+      $('startScreen').style.display='none';
+      playerHp=100; enemyHp=100; score=0; boostAmount=100; invulnerable=0;
+      $('playerHpText').textContent='100'; $('playerHpBar').style.width='100%';
+      $('enemyHpText').textContent='100'; $('enemyHpBar').style.width='100%';
+      $('scoreText').textContent='000';
+      updateResourceHUD();
+      player.position.set(0,0,0); player.rotation.set(0,0,0); playerVelocity.set(0,0,0);
+      viewYaw=0; viewPitch=0;
+      resetEnemy();
+      showNotice('SPACE READY','小惑星を探して資材を集めよう');
+      setTimeout(()=>{if(started)hideNotice();},1000);
+      clock.getDelta();
+    }
+    $('startBtn').addEventListener('click',startGame);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt=Math.min(clock.getDelta(),.035);
+      if(!started){renderer.render(scene,camera);return;}
+      if(buildMode){previewRenderer.render(previewScene,previewCamera);return;}
+      elapsed+=dt;
+      fireCooldown=Math.max(0,fireCooldown-dt);
+      enemyFireCooldown=Math.max(0,enemyFireCooldown-dt);
+      invulnerable=Math.max(0,invulnerable-dt);
+      if(playerHp<=0) {
+        gameOverTimer-=dt;
+        if(gameOverTimer<=0) {
+          playerHp=100; $('playerHpText').textContent='100'; $('playerHpBar').style.width='100%';
+          player.position.set(0,0,0); player.rotation.set(0,0,0); invulnerable=2;
+          resetEnemy(); hideNotice();
+        }
+      } else {
+        const left=keys.KeyA||keys.ArrowLeft, right=keys.KeyD||keys.ArrowRight;
+        const forwardKey=keys.KeyW||keys.ArrowUp, backKey=keys.KeyS||keys.ArrowDown;
+        const kx=(right?1:0)-(left?1:0);
+        const ky=(backKey?1:0)-(forwardKey?1:0);
+        const x=Math.abs(moveX)>.04?moveX:kx;
+        const y=Math.abs(moveY)>.04?moveY:ky;
+        // Mobile stick up/down also adds climb/dive while retaining forward/back movement.
+        // The +/- buttons and Q/E remain available for independent altitude control.
+        const keyVertical=(keys.KeyE?1:0)-(keys.KeyQ?1:0);
+        const vertical=THREE.MathUtils.clamp(mobileVertical+keyVertical-moveY*.72,-1,1);
+        const boosting=keys.ShiftLeft||keys.ShiftRight||mobileBoost;
+        updatePlayer(dt,x,y,vertical,boosting);
+        if(keys.Space||mouseFire||mobileFire) firePlayer();
+        updateEnemy(dt);
+      }
+      updateShots(dt);
+      if(started && !buildMode && playerHp>0) { updateAsteroidField(dt); updateMining(dt); }
+      updateCamera(dt);
+      updateHUD();
+      renderer.render(scene,camera);
+    }
+    addEventListener('resize',()=>{
+      camera.aspect=innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth,innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
+      if(buildMode) resizeShipPreview();
+    });
+    animate();
+  </script>
+</body>
+</html>
